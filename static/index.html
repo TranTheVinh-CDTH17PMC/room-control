@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Room Control AI – Phòng Dev</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #1f2330; --muted: #5b6070; --line: #e7e2d8; --paper: #ffffff; --bg: #f4f1ea;
+    --accent: #e8590c;
+    --font: "Be Vietnam Pro", system-ui, "Segoe UI", sans-serif; --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--font); color: var(--ink); background: var(--bg); overflow: hidden; font-size: 14px; }
+  button, input, select { font: inherit; }
+  .app { display: grid; grid-template-columns: 264px 1fr; height: 100vh; }
+
+  /* sidebar */
+  aside.side { background: var(--paper); border-right: 1px solid var(--line); display: flex; flex-direction: column; overflow-y: auto; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px; }
+  .brand-logo { width: 36px; height: 36px; border-radius: 11px; background: var(--ink); display: grid; place-items: center; flex-shrink: 0; }
+  .brand b { font-size: 15.5px; font-weight: 800; }
+  .brand small { display: block; color: var(--muted); font-size: 12px; }
+  .online { margin-left: auto; width: 9px; height: 9px; border-radius: 50%; background: #2f9e44; box-shadow: 0 0 0 4px #e6f6ea; flex-shrink: 0; }
+  .online.off { background: #e03131; box-shadow: 0 0 0 4px #ffe3e3; }
+  .sec { padding: 10px 12px 4px; }
+  .sec h3 { margin: 0 6px 6px; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+  .item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; color: #3a3f4f; font-weight: 500; border: none; background: none; width: 100%; text-align: left; }
+  .item:hover { background: #f6f3ed; }
+  .item.active { background: #fff0e6; color: #a63e06; font-weight: 600; }
+  .item .hash { color: #a2a6b2; font-weight: 600; width: 14px; text-align: center; }
+  .mini-av { width: 24px; height: 24px; border-radius: 50%; color: #fff; display: grid; place-items: center; font-size: 9.5px; font-weight: 800; flex-shrink: 0; position: relative; }
+  .mini-av .sd { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid #fff; }
+  .item .sub { margin-left: auto; font-size: 11px; color: var(--muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 92px; }
+  .clis { margin: 8px 18px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+  .clis div { display: flex; justify-content: space-between; gap: 8px; }
+  .clis code { font-family: var(--mono); font-size: 11.5px; }
+  .ok { color: #2b8a3e; font-weight: 600; } .no { color: #c92a2a; font-weight: 600; }
+  .usage { margin: 10px 18px; padding: 12px; border-radius: 14px; background: #fff8ec; border: 1px solid #f4e3c3; }
+  .usage b { font-size: 18px; }
+  .usage small { color: #8a5300; display: block; font-size: 12px; }
+  .side-foot { margin-top: auto; padding: 12px 18px; font-size: 11.5px; color: #8b8fa0; }
+
+  /* main */
+  main { display: flex; flex-direction: column; min-width: 0; }
+  nav.tabs { display: flex; gap: 4px; padding: 0 16px; background: var(--paper); border-bottom: 1px solid var(--line); overflow-x: auto; align-items: center; }
+  nav.tabs button { border: none; background: none; padding: 14px 12px 12px; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+  nav.tabs button.on { color: var(--ink); border-color: var(--accent); }
+  nav.tabs .spacer { flex: 1; }
+  nav.tabs .act { border: 1px solid var(--line) !important; border-radius: 10px; padding: 7px 12px !important; color: var(--ink) !important; background: #fff !important; }
+
+  .stage { position: relative; flex: 1; overflow: hidden; background: linear-gradient(#dff0ff, #f7f2e8 70%); }
+  #three, #labels { position: absolute; inset: 0; }
+  #labels { pointer-events: none; z-index: 1; isolation: isolate; }
+
+  .ov { position: absolute; z-index: 5; }
+  .title { left: 18px; top: 16px; pointer-events: none; }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .title p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+  .chips { right: 16px; top: 14px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 66%; }
+  .chip { display: flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 99px; background: rgba(255,255,255,.9); border: 1px solid var(--line); font-size: 12.5px; font-weight: 600; box-shadow: 0 6px 18px -12px rgba(0,0,0,.35); }
+  .chip .d { width: 8px; height: 8px; border-radius: 50%; }
+  .chip b { font-weight: 800; }
+  .cam { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .cam button { padding: 7px 12px; border-radius: 99px; background: rgba(255,255,255,.9); color: var(--ink); border: 1px solid var(--line); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .cam button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  kbd { font-family: var(--mono); font-size: 10px; padding: 0 4px; border-radius: 4px; border: 1px solid currentColor; opacity: .7; }
+
+  .lab { pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; user-select: none; }
+  .lab .nm { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.96); border: 1px solid var(--line); padding: 3px 9px 3px 7px; border-radius: 99px; font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 12px -6px rgba(0,0,0,.3); }
+  .lab .nm .d { width: 8px; height: 8px; border-radius: 50%; }
+  .lab .st { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; color: #fff; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+  .lab.sel .nm { box-shadow: 0 0 0 2px var(--ink); }
+  .bubble { pointer-events: none; max-width: 220px; background: #fff; border: 1px solid var(--line); border-radius: 12px 12px 12px 3px; padding: 6px 9px; font-size: 11.5px; font-weight: 500; color: #3a3f4f; box-shadow: 0 8px 20px -10px rgba(0,0,0,.35); transform: translate(56%, -110%); opacity: 0; transition: opacity .3s; }
+  .bubble.show { opacity: 1; }
+  .zzz { pointer-events: none; font-weight: 800; color: #339af0; font-size: 16px; animation: zz 2s infinite; }
+  @keyframes zz { 0% { transform: translate(0,0); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(14px,-26px); opacity: 0; } }
+  .zone { pointer-events: none; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #8a7a5c; background: rgba(255,250,240,.85); padding: 3px 9px; border-radius: 6px; }
+
+  /* chat */
+  .chat { left: 16px; bottom: 16px; width: 440px; max-width: calc(100% - 32px); height: 52%; min-height: 260px; display: flex; flex-direction: column; background: rgba(255,255,255,.97); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 24px 50px -24px rgba(0,0,0,.4); overflow: hidden; }
+  .chat.big { width: min(760px, calc(100% - 32px)); height: calc(100% - 32px); }
+  .chat.min { height: auto; min-height: 0; }
+  .chat.min .feed, .chat.min form, .chat.min .target { display: none; }
+  .chat header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 10px 14px; border-bottom: 1px solid #f0ece4; gap: 8px; }
+  .chat header b { font-size: 14.5px; }
+  .chat header .who { font-size: 12px; color: var(--muted); }
+  .chat header .btns { display: flex; gap: 6px; }
+  .chat header button { border: none; background: #f4f1ea; border-radius: 8px; height: 28px; min-width: 28px; padding: 0 8px; cursor: pointer; color: var(--muted); font-size: 12px; font-weight: 600; }
+  .feed { overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .m { display: flex; gap: 9px; animation: up .3s ease both; min-width: 0; }
+  @keyframes up { from { opacity: 0; transform: translateY(6px); } }
+  .m .mini-av { width: 28px; height: 28px; font-size: 10px; }
+  .m .bd { min-width: 0; flex: 1; }
+  .m .t { font-size: 12px; margin-bottom: 3px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .m .t span { color: var(--muted); }
+  .m .x { font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; }
+  .m.me { justify-content: flex-end; }
+  .m.me .x { background: var(--ink); color: #fff; padding: 8px 12px; border-radius: 14px 14px 4px 14px; max-width: 85%; white-space: pre-wrap; }
+  .m.sys .x { font-size: 12.5px; color: var(--muted); background: #f7f5f0; padding: 6px 10px; border-radius: 10px; width: 100%; }
+  .m.err .x { color: #c92a2a; background: #fff0f0; }
+  .m.final .x { background: #fff8f2; border: 1px solid #ffd8bf; border-radius: 4px 14px 14px 14px; padding: 10px 12px; }
+  .m.res .x { background: #fbfaf7; border: 1px solid #efeae0; border-radius: 4px 14px 14px 14px; padding: 8px 12px; }
+  .tag { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 99px; }
+  .clamp { max-height: 220px; overflow: hidden; position: relative; }
+  .clamp::after { content: ""; position: absolute; inset: auto 0 0 0; height: 60px; background: linear-gradient(transparent, #fbfaf7); }
+  .more { border: none; background: none; color: var(--accent); font-weight: 600; font-size: 12.5px; cursor: pointer; padding: 4px 0 0; }
+  .hand { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #3a3f4f; background: #f7f5f0; padding: 6px 10px; border-radius: 10px; animation: up .3s ease both; }
+  .hand .mini-av { width: 20px; height: 20px; font-size: 8.5px; }
+  .hand span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .quick { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .quick button { border: 1px solid var(--line); background: #fff; padding: 6px 12px; border-radius: 99px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .quick button:hover { border-color: var(--accent); color: var(--accent); }
+  .quick button:disabled { opacity: .45; cursor: default; }
+  .target { display: flex; align-items: center; gap: 8px; padding: 8px 12px 0; font-size: 12.5px; color: var(--muted); }
+  .target .pill { display: inline-flex; align-items: center; gap: 6px; background: #f4f1ea; border-radius: 99px; padding: 3px 4px 3px 10px; color: var(--ink); font-weight: 600; }
+  .target .pill button { border: none; background: #e7e2d8; border-radius: 99px; width: 20px; height: 20px; cursor: pointer; font-size: 11px; }
+  .chat form { display: flex; gap: 8px; padding: 10px; }
+  .chat textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: inherit; font-size: 13.5px; outline: none; max-height: 140px; }
+  .chat textarea:focus { border-color: #f4b48c; box-shadow: 0 0 0 3px #fff0e6; }
+  .chat form button { border: none; background: var(--accent); color: #fff; border-radius: 12px; padding: 0 16px; font-weight: 700; cursor: pointer; }
+  .chat form button:disabled { opacity: .5; cursor: default; }
+
+  /* markdown */
+  .md > :first-child { margin-top: 0; } .md > :last-child { margin-bottom: 0; }
+  .md p { margin: 0 0 8px; }
+  .md h1, .md h2, .md h3, .md h4 { margin: 12px 0 6px; line-height: 1.3; font-size: 14.5px; }
+  .md h1 { font-size: 16.5px; } .md h2 { font-size: 15.5px; }
+  .md ul, .md ol { margin: 0 0 8px; padding-left: 20px; }
+  .md li { margin: 2px 0; }
+  .md code { font-family: var(--mono); font-size: .87em; background: #f1ede5; padding: 1px 5px; border-radius: 5px; }
+  .md pre { background: #1f2330; color: #e9eaf0; border-radius: 10px; margin: 8px 0; overflow: hidden; }
+  .md pre .ch { display: flex; justify-content: space-between; font-size: 11px; color: #9aa0b4; padding: 5px 10px; border-bottom: 1px solid #343949; font-family: var(--mono); }
+  .md pre .ch button { background: none; border: none; color: #c4c8d6; cursor: pointer; font: inherit; }
+  .md pre code { display: block; background: none; padding: 10px 12px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; color: inherit; }
+  .md table { border-collapse: collapse; margin: 0 0 8px; font-size: 13px; display: block; overflow-x: auto; }
+  .md th, .md td { border: 1px solid #e1dbcf; padding: 5px 8px; text-align: left; }
+  .md th { background: #f4f1ea; }
+  .md blockquote { margin: 0 0 8px; padding-left: 10px; border-left: 3px solid #e1dbcf; color: var(--muted); }
+  .md a { color: #1c7ed6; }
+
+  /* card */
+  .card { right: 16px; top: 96px; width: 300px; background: rgba(255,255,255,.98); border: 1px solid var(--line); border-radius: 18px; padding: 16px; box-shadow: 0 24px 50px -24px rgba(0,0,0,.4); display: none; flex-direction: column; gap: 12px; }
+  .card.show { display: flex; }
+  .card .top { display: flex; align-items: center; gap: 12px; }
+  .card .big { width: 48px; height: 48px; border-radius: 50%; color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 16px; flex-shrink: 0; }
+  .card h2 { margin: 0; font-size: 17px; }
+  .card .role { font-size: 12.5px; color: var(--muted); }
+  .card .close { margin-left: auto; align-self: flex-start; border: none; background: #f4f1ea; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; color: var(--muted); }
+  .kv { display: grid; grid-template-columns: 86px 1fr; gap: 6px 10px; font-size: 13px; }
+  .kv span { color: var(--muted); }
+  .kv code { font-family: var(--mono); font-size: 12px; background: #f4f1ea; padding: 1px 6px; border-radius: 6px; }
+  .card .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .card .acts button { flex: 1; padding: 9px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-weight: 600; cursor: pointer; }
+  .card .acts button.p { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  /* modal */
+  .modal { position: fixed; inset: 0; background: rgba(31,35,48,.35); z-index: 50; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .modal.show { display: flex; }
+  .sheet { background: #fff; border-radius: 20px; width: min(1040px, 100%); max-height: 100%; overflow: auto; padding: 22px; box-shadow: 0 30px 80px -30px rgba(0,0,0,.5); }
+  .sheet h2 { margin: 0 0 4px; font-size: 22px; }
+  .sheet p.sub { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+  .grid { width: 100%; min-width: 980px; border-collapse: collapse; font-size: 13px; }
+  .grid select[data-k=role], .grid select[data-k=cli] { min-width: 100px; }
+  .grid input[data-k=model] { min-width: 180px; }
+  .grid input[data-k=name] { min-width: 120px; }
+  .grid th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 8px; background: #f7f5f0; }
+  .grid td { padding: 8px; border-top: 1px solid #f0ece4; vertical-align: middle; }
+  .grid input[type=text], .grid select { width: 100%; border: 1px solid #ddd6ca; border-radius: 8px; padding: 7px 9px; background: #fff; }
+  .grid input.mono { font-family: var(--mono); font-size: 12px; }
+  .grid input[type=color] { width: 34px; height: 30px; border: none; background: none; padding: 0; }
+  .grid .chk { font-size: 12px; }
+  .sheet .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  .sheet .row .l, .sheet .row .r { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { padding: 10px 16px; border-radius: 12px; border: 1px solid var(--line); background: #fff; font-weight: 600; cursor: pointer; }
+  .btn.p { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.d { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .note { font-size: 12.5px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  .note code { font-family: var(--mono); background: #f4f1ea; padding: 1px 5px; border-radius: 5px; }
+
+  .keys { right: 16px; bottom: 14px; font-size: 11.5px; color: var(--muted); background: rgba(255,255,255,.88); border: 1px solid var(--line); padding: 6px 10px; border-radius: 10px; }
+  .toast { left: 50%; top: 70px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 9px 16px; border-radius: 12px; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 60; }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    aside.side { display: none; }
+    .chips { max-width: 100%; left: 16px; top: 70px; justify-content: flex-start; }
+    .title { display: none; }
+    .card { top: auto; bottom: 16px; left: 16px; width: auto; }
+    .keys { display: none; }
+  }
+</style>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three.module.js", "three/addons/controls/OrbitControls.js": "/vendor/OrbitControls.js", "three/addons/renderers/CSS2DRenderer.js": "/vendor/CSS2DRenderer.js" } }
+</script>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="brand-logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffd8a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></svg></div>
+      <div><b>Room Control AI</b><small>Phòng Dev</small></div>
+      <span class="online" id="online" title="Server"></span>
+    </div>
+    <div class="sec">
+      <h3>Phòng</h3>
+      <button class="item active" type="button" id="roomItem"><span class="hash">#</span>phong-dev</button>
+    </div>
+    <div class="sec">
+      <h3>Nhắn riêng</h3>
+      <div id="dmList"></div>
+    </div>
+    <div class="sec"><h3>CLI trên máy</h3></div>
+    <div class="clis" id="clis"></div>
+    <div class="usage">
+      <small>Token đã dùng (phiên này)</small>
+      <b id="tokNum">0</b>
+      <small id="costNote">Quy đổi giá API: $0.00 · chạy bằng gói thuê bao</small>
+    </div>
+    <div class="side-foot">v0.2 · chạy bằng claude / codex / gemini CLI</div>
+  </aside>
+
+  <main>
+    <nav class="tabs" id="tabs">
+      <button type="button" class="on">Văn phòng 3D</button>
+      <span class="spacer"></span>
+      <button type="button" class="act" id="openSeats">Chỗ ngồi &amp; model</button>
+      <button type="button" class="act" id="newRoom">Cuộc trò chuyện mới</button>
+    </nav>
+    <div class="stage" id="stage">
+      <div id="three"></div>
+      <div id="labels"></div>
+
+      <div class="ov title"><h1>Văn phòng Phòng Dev</h1><p>Kéo để xoay · cuộn để zoom · bấm vào một AI để xem chi tiết</p></div>
+
+      <div class="ov chips">
+        <div class="chip"><span class="d" style="background:#2f9e44"></span>Đang làm <b id="c-working">0</b></div>
+        <div class="chip"><span class="d" style="background:#7950f2"></span>Đang họp <b id="c-meeting">0</b></div>
+        <div class="chip"><span class="d" style="background:#f08c00"></span>Chờ bạn <b id="c-waiting">0</b></div>
+        <div class="chip"><span class="d" style="background:#339af0"></span>Ngủ <b id="c-sleeping">0</b></div>
+        <div class="chip"><span class="d" style="background:#868e96"></span>Rảnh <b id="c-idle">0</b></div>
+        <div class="cam">
+          <button type="button" data-cam="overview">Toàn cảnh <kbd>O</kbd></button>
+          <button type="button" data-cam="meeting">Phòng họp <kbd>M</kbd></button>
+          <button type="button" data-cam="nap">Khu ngủ <kbd>N</kbd></button>
+          <button type="button" id="autoBtn">Tự xoay <kbd>R</kbd></button>
+        </div>
+      </div>
+
+      <section class="ov chat" id="chat" aria-label="Kênh phong-dev">
+        <header>
+          <div><b># phong-dev</b> <span class="who" id="who"></span></div>
+          <div class="btns">
+            <button type="button" id="chatBig" title="Phóng to">Phóng to</button>
+            <button type="button" id="chatMin" aria-label="Thu gọn chat">–</button>
+          </div>
+        </header>
+        <div class="feed" id="feed"></div>
+        <div class="target" id="target"></div>
+        <form id="form">
+          <textarea id="msg" rows="2" placeholder="Giao việc cho Leader…" aria-label="Tin nhắn"></textarea>
+          <button type="submit" id="sendBtn">Gửi</button>
+        </form>
+      </section>
+
+      <section class="ov card" id="card" aria-label="Chi tiết AI">
+        <div class="top">
+          <div class="big" id="cAv"></div>
+          <div><h2 id="cName"></h2><div class="role" id="cRole"></div></div>
+          <button class="close" type="button" id="cClose" aria-label="Đóng">✕</button>
+        </div>
+        <div class="kv">
+          <span>CLI</span><div><code id="cCli"></code></div>
+          <span>Model</span><div><code id="cModel"></code></div>
+          <span>Trạng thái</span><div id="cState"></div>
+          <span>Đang làm</span><div id="cTask"></div>
+          <span>Token</span><div id="cTok"></div>
+        </div>
+        <div class="acts">
+          <button type="button" class="p" id="cDm">Nhắn riêng</button>
+          <button type="button" id="cFollow">Theo dõi</button>
+          <button type="button" id="cWake" style="display:none">Đánh thức</button>
+        </div>
+      </section>
+
+      <div class="ov keys">O toàn cảnh · M họp · N khu ngủ · R tự xoay · C chat · Esc đóng</div>
+      <div class="ov toast" id="toast"></div>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="modal">
+  <div class="sheet" role="dialog" aria-label="Chỗ ngồi và model">
+    <h2>Chỗ ngồi &amp; model</h2>
+    <p class="sub">Mỗi vị trí chạy bằng một CLI đã đăng nhập trên máy. Để trống ô model để dùng model mặc định của CLI.</p>
+    <div style="overflow-x:auto">
+      <table class="grid">
+        <thead><tr><th></th><th>Tên</th><th>Vai trò</th><th>Chức danh</th><th>CLI</th><th>Model</th><th>Bật</th><th>Kiểm tra</th><th></th></tr></thead>
+        <tbody id="seatRows"></tbody>
+      </table>
+    </div>
+    <div class="row">
+      <div class="l">
+        <button type="button" class="btn" id="addDev">+ Thêm Dev</button>
+        <button type="button" class="btn d" id="checkBtn">Kiểm tra kết nối</button>
+      </div>
+      <div class="r">
+        <button type="button" class="btn" id="closeSeats">Đóng</button>
+        <button type="button" class="btn p" id="saveSeats">Lưu &amp; tải lại</button>
+      </div>
+    </div>
+    <div class="note">
+      Đăng nhập mỗi CLI một lần trong terminal: <code>claude</code> (gói Claude), <code>codex login</code> (gói ChatGPT), <code>gemini</code> (tài khoản Google).
+      Model Claude có thể dùng tên đầy đủ (vd. <code>claude-opus-5-5</code>) hoặc bí danh <code>opus</code>, <code>sonnet</code>.
+      Lưu ý: mọi vị trí dùng <code>claude</code> chia chung hạn mức chạy nền của gói Claude.
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const STATE = {
+  working:  { label: 'Đang làm', color: '#2f9e44' },
+  meeting:  { label: 'Đang họp', color: '#7950f2' },
+  waiting:  { label: 'Chờ bạn',  color: '#f08c00' },
+  sleeping: { label: 'Ngủ · hết hạn mức', color: '#339af0' },
+  idle:     { label: 'Rảnh',     color: '#868e96' },
+  offline:  { label: 'Chưa cài CLI', color: '#495057' },
+};
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+let SEATS = [];        // [{seat, state, task, tokens, cost, sleep_text, installed}]
+let byId = {};
+let roomId;
+try { roomId = localStorage.getItem('roomai.room') || Math.random().toString(36).slice(2); localStorage.setItem('roomai.room', roomId); } catch { roomId = Math.random().toString(36).slice(2); }
+
+/* ================= three ================= */
+const host = $('#three');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+host.appendChild(renderer.domElement);
+const labelRenderer = new CSS2DRenderer();
+Object.assign(labelRenderer.domElement.style, { position: 'absolute', inset: '0' });
+$('#labels').appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog('#eef5fb', 70, 130);
+const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 300);
+camera.position.set(27, 24, 29);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(-1, 0, -1);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.maxPolarAngle = 1.25; controls.minDistance = 8; controls.maxDistance = 90; controls.autoRotateSpeed = 0.6;
+
+scene.add(new THREE.HemisphereLight('#ffffff', '#e8d9bd', 1.1));
+const sun = new THREE.DirectionalLight('#fff4e2', 2.1);
+sun.position.set(18, 30, 14); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 24, bottom: -24, near: 1, far: 80 });
+sun.shadow.bias = -0.0004; scene.add(sun);
+scene.add(new THREE.AmbientLight('#ffffff', 0.25));
+
+const mats = {};
+function mat(color, opts = {}) { const k = color + JSON.stringify(opts); return mats[k] ||= new THREE.MeshStandardMaterial({ color, roughness: 0.7, ...opts }); }
+function box(w, h, d, color, x, y, z, material) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material || mat(color));
+  m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; scene.add(m); return m;
+}
+function cyl(rt, rb, h, color, x, y, z, seg = 24) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat(color));
+  m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; scene.add(m); return m;
+}
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+}
+function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function label(html, cls, obj, y) { const el = document.createElement('div'); el.className = cls; el.innerHTML = html; const o = new CSS2DObject(el); o.position.set(0, y, 0); obj.add(o); return { el, o }; }
+function zoneLabel(text, x, z) { const g = new THREE.Object3D(); g.position.set(x, 0.05, z); scene.add(g); label(text, 'zone', g, 0); }
+
+/* ---------- room ---------- */
+const W = 44, D = 30;
+const floorTex = canvasTex(1024, 1024, (ctx, w, h) => {
+  ctx.fillStyle = '#ead6b4'; ctx.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 64) for (let x = -((y / 64) % 3) * 120; x < w; x += 360) {
+    const v = 214 + Math.floor(Math.random() * 18); ctx.fillStyle = `rgb(${v + 20},${v},${v - 34})`; ctx.fillRect(x + 2, y + 2, 356, 60);
+  }
+});
+floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(3, 2);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.85 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+box(W + 0.6, 0.6, D + 0.6, '#d9c4a0', 0, -0.31, 0);
+box(W + 0.6, 7, 0.5, '#fbf7f0', 0, 3.5, -D / 2 - 0.25);
+box(0.5, 7, D + 0.6, '#fbf7f0', -W / 2 - 0.25, 3.5, 0);
+box(W + 0.6, 0.35, 0.55, '#e3d3b8', 0, 0.17, -D / 2 - 0.2);
+box(0.55, 0.35, D + 0.6, '#e3d3b8', -W / 2 - 0.2, 0.17, 0);
+
+const skyTex = canvasTex(256, 256, (ctx, w, h) => {
+  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#8fc9ff'); g.addColorStop(.65, '#d7ecff'); g.addColorStop(1, '#bfe3c6');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); ctx.fillStyle = 'rgba(255,255,255,.85)';
+  [[60, 70, 34], [92, 62, 26], [180, 110, 28], [204, 104, 20]].forEach(([x, y, r]) => { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); });
+});
+const winMat = new THREE.MeshBasicMaterial({ map: skyTex });
+function windowOn(x, y, z, w, h, rotY) {
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rotY; scene.add(g);
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, h + 0.4, 0.12), mat('#ffffff')));
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(w, h), winMat); glass.position.z = 0.07; g.add(glass);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.1, h, 0.08), mat('#ffffff')); bar.position.z = 0.1; g.add(bar);
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(w + 0.8, 0.12, 0.4), mat('#e9dcc6')); sill.position.set(0, -h / 2 - 0.25, 0.2); g.add(sill);
+}
+[-6, 2].forEach(x => windowOn(x, 4, -D / 2 + 0.02, 4.2, 2.6, 0));
+[-9, 0, 9].forEach(z => windowOn(-W / 2 + 0.02, 4, z, 4.2, 2.6, Math.PI / 2));
+
+const signTex = canvasTex(1024, 256, (ctx, w, h) => {
+  ctx.fillStyle = '#1f2330'; rr(ctx, 0, 0, w, h, 40); ctx.fill();
+  ctx.fillStyle = '#ffb380'; ctx.font = '800 104px "Be Vietnam Pro", sans-serif'; ctx.textBaseline = 'middle'; ctx.fillText('ROOM AI', 60, h / 2 + 6);
+  ctx.fillStyle = '#ffffff'; ctx.font = '600 60px "Be Vietnam Pro", sans-serif'; ctx.fillText('· Phòng Dev', 540, h / 2 + 8);
+});
+const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: signTex, transparent: true }));
+sign.position.set(16.5, 6.15, -D / 2 + 0.03); sign.scale.setScalar(0.6); scene.add(sign);
+
+// whiteboard: live log of the room
+const wbCanvas = document.createElement('canvas'); wbCanvas.width = 1024; wbCanvas.height = 640;
+const wbTex = new THREE.CanvasTexture(wbCanvas); wbTex.colorSpace = THREE.SRGBColorSpace;
+const wbLines = [];
+function drawWB() {
+  const ctx = wbCanvas.getContext('2d'), w = 1024, h = 640;
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#1f2330'; ctx.font = '800 50px "Be Vietnam Pro", sans-serif'; ctx.fillText('Bảng trắng · Việc hôm nay', 46, 84);
+  ctx.font = '500 34px "Be Vietnam Pro", sans-serif';
+  if (!wbLines.length) { ctx.fillStyle = '#868e96'; ctx.fillText('Chưa có việc nào. Gửi yêu cầu cho Leader nhé!', 50, 170); }
+  wbLines.slice(-7).forEach((l, i) => { ctx.fillStyle = l.color; const t = l.text.length > 46 ? l.text.slice(0, 45) + '…' : l.text; ctx.fillText((l.done ? '✓ ' : '○ ') + t, 50, 170 + i * 64); });
+  wbTex.needsUpdate = true;
+}
+drawWB();
+const wb = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 3.25), new THREE.MeshBasicMaterial({ map: wbTex }));
+wb.position.set(7.8, 4.1, -D / 2 + 0.05); scene.add(wb);
+
+const DESK = '#d8bc94', DARK = '#2b2f3a';
+function plant(x, z, s = 1) {
+  cyl(0.45 * s, 0.35 * s, 0.8 * s, '#e8590c', x, 0.4 * s, z);
+  const l1 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9 * s, 0), mat('#5fae6e', { flatShading: true })); l1.position.set(x, 1.5 * s, z); l1.castShadow = true; scene.add(l1);
+  const l2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6 * s, 0), mat('#7cc48c', { flatShading: true })); l2.position.set(x + 0.3 * s, 2.2 * s, z - 0.2 * s); l2.castShadow = true; scene.add(l2);
+}
+function chair(x, z, rotY, color = '#3a3f4f') {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rotY; scene.add(g);
+  const add = (geo, c, px, py, pz) => { const m = new THREE.Mesh(geo, mat(c)); m.position.set(px, py, pz); m.castShadow = true; g.add(m); };
+  add(new THREE.BoxGeometry(0.9, 0.12, 0.9), color, 0, 0.55, 0); add(new THREE.BoxGeometry(0.9, 0.9, 0.12), color, 0, 1.0, 0.42);
+  add(new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8), '#8a8f9c', 0, 0.28, 0); add(new THREE.CylinderGeometry(0.4, 0.4, 0.06, 16), '#8a8f9c', 0, 0.03, 0);
+}
+function screenMesh(w, h, x, y, z) {
+  const s = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ color: '#20242e', emissive: '#20242e' }));
+  s.position.set(x, y, z); scene.add(s); return s;
+}
+function desk(x, z) {
+  box(2.6, 0.12, 1.3, DESK, x, 0.95, z);
+  [[-1.2, -0.55], [1.2, -0.55], [-1.2, 0.55], [1.2, 0.55]].forEach(([dx, dz]) => box(0.08, 0.95, 0.08, '#a9adb8', x + dx, 0.47, z + dz));
+  box(0.08, 0.5, 0.08, '#6b7080', x, 1.25, z - 0.35); box(1.3, 0.78, 0.07, DARK, x, 1.75, z - 0.38);
+  const scr = screenMesh(1.18, 0.66, x, 1.75, z - 0.34);
+  box(0.9, 0.04, 0.3, '#f1f3f5', x - 0.1, 1.03, z + 0.15); cyl(0.09, 0.08, 0.2, '#ffffff', x + 0.9, 1.11, z + 0.1, 12);
+  chair(x, z + 1.15, 0);
+  return { seat: new THREE.Vector3(x, 0, z + 1.15), face: Math.PI, screen: scr };
+}
+
+// leader office
+const glass = new THREE.MeshPhysicalMaterial({ color: '#cfe8ff', transparent: true, opacity: 0.28, roughness: 0.05, side: THREE.DoubleSide });
+box(3.2, 3, 0.06, null, -19.4, 1.5, -6, glass); box(3.6, 3, 0.06, null, -13.8, 1.5, -6, glass); box(0.06, 3, 8.5, null, -12, 1.5, -10.25, glass);
+box(9, 0.1, 0.12, '#9aa3b2', -16.5, 3.0, -6); box(0.12, 0.1, 8.5, '#9aa3b2', -12, 3.0, -10.25);
+[-21, -17.8, -15.2, -12].forEach(x => box(0.1, 3, 0.1, '#9aa3b2', x, 1.5, -6));
+box(8.8, 0.04, 8.4, '#ffe8d6', -16.5, 0.02, -10.3);
+box(3.4, 0.14, 1.5, '#b07a4a', -16.5, 1.0, -11); box(3.4, 0.9, 0.12, '#9a6a3e', -16.5, 0.5, -11.7);
+box(1.6, 0.9, 0.07, DARK, -17.2, 1.8, -11.4); box(1.0, 0.7, 0.07, DARK, -15.5, 1.75, -11.35);
+const leaderSpot = { seat: new THREE.Vector3(-16.5, 0, -9.9), face: Math.PI, screen: screenMesh(1.48, 0.78, -17.2, 1.8, -11.36) };
+chair(-16.5, -9.9, 0, '#e8590c'); plant(-20.3, -13.8, 0.9); zoneLabel('Phòng Leader', -16.5, -6.6);
+
+// desks
+const deskSlots = [];
+[-10.5, -4.5].forEach(z => [-7, -2, 3, 8].forEach(x => deskSlots.push(desk(x, z))));
+zoneLabel('Khu làm việc', 0.5, -1.5);
+
+// meeting
+box(9, 0.04, 8, '#ece5ff', 16.5, 0.02, -9.5); cyl(1.9, 1.9, 0.12, '#b07a4a', 16.5, 1.0, -9.5, 40); cyl(0.25, 0.4, 1.0, '#8a6a4a', 16.5, 0.5, -9.5, 16);
+const meetSeats = [];
+for (let i = 0; i < 8; i++) {
+  const a = (i / 8) * Math.PI * 2 + Math.PI / 8, x = 16.5 + Math.cos(a) * 2.9, z = -9.5 + Math.sin(a) * 2.9;
+  const face = Math.atan2(16.5 - x, -9.5 - z); chair(x, z, face + Math.PI, '#7950f2'); meetSeats.push({ seat: new THREE.Vector3(x, 0, z), face });
+}
+const tvTex = canvasTex(1024, 576, (ctx, w, h) => {
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+  const n = ['Cần làm', 'Đang làm', 'Review', 'Test', 'Xong'], cc = ['#868e96', '#e8590c', '#1c7ed6', '#d6336c', '#2f9e44'];
+  n.forEach((t, i) => { const x = 24 + i * 198; ctx.fillStyle = '#f4f1ea'; rr(ctx, x, 24, 184, 528, 16); ctx.fill(); ctx.fillStyle = cc[i]; ctx.font = '700 28px "Be Vietnam Pro", sans-serif'; ctx.fillText(t, x + 14, 64); });
+});
+box(6.4, 3.8, 0.18, DARK, 16.5, 3.4, -D / 2 + 0.1);
+const tv = new THREE.Mesh(new THREE.PlaneGeometry(6, 3.4), new THREE.MeshBasicMaterial({ map: tvTex })); tv.position.set(16.5, 3.4, -D / 2 + 0.2); scene.add(tv);
+plant(21, -14, 1); zoneLabel('Phòng họp', 16.5, -4.4);
+
+// nap zone
+const bedSpots = [];
+box(10, 0.04, 12, '#e3f0ff', -16.5, 0.02, 7.5);
+[3.5, 7.5, 11.5].forEach((z, i) => {
+  const x = -17;
+  box(3.4, 0.4, 1.8, '#ffffff', x, 0.3, z); box(3.2, 0.25, 1.6, ['#ffd8a8', '#b2f2bb', '#d0bfff'][i], x + 0.1, 0.62, z);
+  box(0.8, 0.22, 1.2, '#ffffff', x - 1.15, 0.85, z); box(0.15, 1.3, 1.9, '#c99a66', x - 1.75, 0.65, z);
+  cyl(0.25, 0.25, 0.7, '#e9dcc6', x - 1.6, 0.35, z - 1.35, 12); bedSpots.push({ x, z, by: null });
+});
+zoneLabel('Khu ngủ · hết hạn mức', -16.5, 13.8);
+
+// lounge + coffee
+cyl(3.4, 3.4, 0.04, '#ffe3e3', 4, 0.02, 9, 48);
+(() => { const g = new THREE.Group(); g.position.set(4, 0, 12.5); g.rotation.y = Math.PI; scene.add(g);
+  [[4, 0.6, 1.6, 0, 0.4, 0], [4, 1.1, 0.4, 0, 0.9, -0.6], [0.4, 0.9, 1.6, -1.8, 0.75, 0], [0.4, 0.9, 1.6, 1.8, 0.75, 0]].forEach(([w, h, d, px, py, pz]) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat('#20c997')); m.position.set(px, py, pz); m.castShadow = m.receiveShadow = true; g.add(m); }); })();
+const bean = (x, z, c) => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.9, 24, 16), mat(c, { roughness: 0.9 })); m.scale.set(1, 0.6, 1); m.position.set(x, 0.5, z); m.castShadow = true; scene.add(m); };
+bean(1.2, 7.2, '#ffa94d'); bean(6.8, 7.2, '#748ffc');
+cyl(0.8, 0.8, 0.08, '#ffffff', 4, 0.75, 8.8, 32); cyl(0.12, 0.12, 0.7, '#adb5bd', 4, 0.37, 8.8, 12);
+box(6, 1.2, 1.2, '#b07a4a', 16.5, 0.6, 13.6); box(6.2, 0.1, 1.4, '#f1f3f5', 16.5, 1.25, 13.6); box(0.8, 0.9, 0.6, DARK, 15, 1.75, 13.7);
+cyl(0.12, 0.1, 0.25, '#ffffff', 16.2, 1.42, 13.4, 12); cyl(0.12, 0.1, 0.25, '#e8590c', 16.6, 1.42, 13.5, 12);
+plant(20.8, 13.5, 0.9); plant(-8.5, 13.5, 1.1); plant(9.5, -1.5, 0.8);
+const coffeeSpots = [[14.2, 11.4], [16.5, 11.4], [18.8, 11.4]].map(([x, z]) => ({ seat: new THREE.Vector3(x, 0, z), face: 0, sit: false }));
+zoneLabel('Góc cà phê', 16.5, 9.8);
+
+/* ================= robots ================= */
+const robots = {}, clickables = [];
+function makeRobot(s) {
+  const g = new THREE.Group(); scene.add(g);
+  const body = new THREE.Group(); g.add(body);
+  const cMat = new THREE.MeshStandardMaterial({ color: s.color, roughness: 0.45 });
+  const wMat = new THREE.MeshStandardMaterial({ color: '#fbfbfd', roughness: 0.35 });
+  const add = (geo, m, x, y, z, parent = body) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.userData.id = s.id; parent.add(o); clickables.push(o); return o; };
+  const legs = new THREE.Group(); body.add(legs);
+  add(new THREE.CylinderGeometry(0.11, 0.11, 0.35, 10), mat('#4a4f5e'), -0.18, 0.18, 0, legs);
+  add(new THREE.CylinderGeometry(0.11, 0.11, 0.35, 10), mat('#4a4f5e'), 0.18, 0.18, 0, legs);
+  add(new THREE.CapsuleGeometry(0.44, 0.45, 6, 18), cMat, 0, 0.88, 0);
+  add(new THREE.CircleGeometry(0.2, 20), wMat, 0, 0.9, 0.441);
+  const head = new THREE.Group(); head.position.y = 1.78; body.add(head);
+  add(new THREE.SphereGeometry(0.47, 24, 18), wMat, 0, 0, 0, head);
+  add(new THREE.BoxGeometry(0.66, 0.32, 0.12), mat('#1f2330', { roughness: 0.2 }), 0, 0.02, 0.4, head);
+  const eyeMat = new THREE.MeshStandardMaterial({ color: '#7df9ff', emissive: '#7df9ff', emissiveIntensity: 1.5 });
+  add(new THREE.SphereGeometry(0.06, 10, 8), eyeMat, -0.14, 0.03, 0.47, head); add(new THREE.SphereGeometry(0.06, 10, 8), eyeMat, 0.14, 0.03, 0.47, head);
+  add(new THREE.CylinderGeometry(0.025, 0.025, 0.28, 6), mat('#868e96'), 0, 0.58, 0, head);
+  const bulbMat = new THREE.MeshStandardMaterial({ color: '#868e96', emissive: '#868e96', emissiveIntensity: 0.6 });
+  add(new THREE.SphereGeometry(0.1, 14, 10), bulbMat, 0, 0.76, 0, head);
+  const armGeo = new THREE.CapsuleGeometry(0.1, 0.36, 4, 8);
+  const armL = new THREE.Group(); armL.position.set(-0.55, 1.15, 0); body.add(armL);
+  const armR = new THREE.Group(); armR.position.set(0.55, 1.15, 0); body.add(armR);
+  add(armGeo, cMat, 0, -0.25, 0, armL); add(armGeo, cMat, 0, -0.25, 0, armR);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.9, 40), new THREE.MeshBasicMaterial({ color: s.color, transparent: true, opacity: 0.9 }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; ring.visible = false; g.add(ring);
+  const lab = label(`<div class="nm"><span class="d"></span>${esc(s.name)}</div><div class="st"></div>`, 'lab', g, 2.95);
+  lab.el.addEventListener('click', () => select(s.id));
+  const bub = label('', 'bubble', g, 2.6);
+  const zz = label('Z z z', 'zzz', g, 1.4); zz.o.visible = false;
+  return { s, g, body, head, legs, armL, armR, bulbMat, ring, lab, bub, zz, cMat, state: 'idle', task: '', tokens: 0, cost: 0,
+    path: [], onArrive: null, sitting: false, lying: false, face: 0, wander: false, bubTimer: 0, home: null, bed: null, meet: null };
+}
+
+/* movement */
+const AISLE_Z = -1.0;
+const inLeader = (v) => v.x < -12 && v.z < -6;
+function routeTo(r, target) {
+  const p = r.g.position, pts = [], door = new THREE.Vector3(-16.5, 0, -5);
+  if (inLeader(p)) pts.push(new THREE.Vector3(-16.5, 0, -8), door);
+  const start = pts.at(-1) || p;
+  if (Math.abs(start.z - target.z) > 0.5 || Math.abs(start.x - target.x) > 0.5) pts.push(new THREE.Vector3(start.x, 0, AISLE_Z), new THREE.Vector3(target.x, 0, AISLE_Z));
+  if (inLeader(target)) { pts.pop(); pts.push(new THREE.Vector3(-16.5, 0, AISLE_Z), door, new THREE.Vector3(-16.5, 0, -8)); }
+  pts.push(target.clone());
+  return pts;
+}
+function freeBed(r) { if (r.bed) { r.bed.by = null; r.bed = null; } }
+function freeMeet(r) { if (r.meet) { r.meet.by = null; r.meet = null; } }
+function walkTo(r, spot) {
+  return new Promise(res => {
+    r.lying = false; r.sitting = false; r.body.rotation.set(0, 0, 0); r.body.position.set(0, 0, 0); r.zz.o.visible = false;
+    if (spot !== r.bedSpot) freeBed(r);
+    r.path = routeTo(r, spot.seat);
+    r.onArrive = () => { r.face = spot.face; r.sitting = spot.sit !== false; res(); };
+  });
+}
+const atSpot = (r, spot) => !r.path.length && r.g.position.distanceTo(spot.seat) < 0.3;
+function goHome(r) { freeMeet(r); if (!atSpot(r, r.home) || r.lying) return walkTo(r, r.home); r.sitting = true; return Promise.resolve(); }
+function goMeeting(r) {
+  if (!r.meet) { r.meet = meetSeats.find(m => !m.by) || meetSeats[0]; r.meet.by = r.s.id; }
+  return atSpot(r, r.meet) ? Promise.resolve() : walkTo(r, r.meet);
+}
+function goSleep(r, instant) {
+  freeMeet(r);
+  if (!r.bed) { r.bed = bedSpots.find(b => !b.by) || bedSpots[0]; r.bed.by = r.s.id; }
+  const b = r.bed;
+  const lie = () => { r.lying = true; r.g.position.set(b.x + 0.7, 0, b.z); r.zz.o.visible = true; };
+  if (instant) { lie(); return Promise.resolve(); }
+  const spot = { seat: new THREE.Vector3(b.x + 2.3, 0, b.z), face: -Math.PI / 2, sit: false };
+  r.bedSpot = spot;
+  return walkTo(r, spot).then(lie);
+}
+
+/* state */
+function setRobotState(id, state, task) {
+  const r = robots[id]; if (!r) return;
+  r.state = state; if (task !== undefined) r.task = task;
+  const s = STATE[state] || STATE.idle;
+  r.bulbMat.color.set(s.color); r.bulbMat.emissive.set(s.color);
+  r.lab.el.querySelector('.d').style.background = s.color;
+  const st = r.lab.el.querySelector('.st');
+  st.textContent = state === 'offline' ? 'Chưa cài ' + r.s.cli : (state === 'working' && r.task ? r.task : s.label);
+  st.title = r.task || ''; st.style.background = s.color;
+  r.cMat.color.set(state === 'offline' ? '#adb5bd' : r.s.color);
+  const scr = r.home?.screen;
+  if (scr) { const on = state === 'working'; scr.material.color.set(on ? r.s.color : '#20242e'); scr.material.emissive.set(on ? r.s.color : '#20242e'); }
+  refreshCounts(); refreshDMs(); if (selected === id) fillCard();
+}
+function refreshCounts() {
+  const c = { working: 0, meeting: 0, waiting: 0, sleeping: 0, idle: 0 };
+  Object.values(robots).forEach(r => { if (c[r.state] !== undefined) c[r.state]++; });
+  for (const k in c) $('#c-' + k).textContent = c[k];
+}
+function say(id, text, ms = 4000) {
+  const r = robots[id]; if (!r) return;
+  const t = text.replace(/[#*`>_]/g, '').replace(/\s+/g, ' ').trim();
+  r.bub.el.textContent = t.length > 90 ? t.slice(0, 88) + '…' : t; r.bub.el.classList.add('show');
+  clearTimeout(r.bubTimer); r.bubTimer = setTimeout(() => r.bub.el.classList.remove('show'), ms);
+}
+const flights = [];
+function ticket(fromId, toId) {
+  const a = robots[fromId], b = robots[toId]; if (!a || !b) return Promise.resolve();
+  const m = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.06, 0.45), new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: b.s.color, emissiveIntensity: 0.4 }));
+  m.castShadow = true; scene.add(m);
+  return new Promise(res => flights.push({ m, from: a.g.position.clone().setY(2.2), to: b.g.position.clone().setY(2.2), t: 0, res }));
+}
+
+/* ================= UI ================= */
+const dmList = $('#dmList');
+function refreshDMs() {
+  dmList.innerHTML = SEATS.map(({ seat: a }) => {
+    const r = robots[a.id]; const st = STATE[r?.state || 'idle'] || STATE.idle;
+    return `<button class="item ${target === a.id ? 'active' : ''}" type="button" data-id="${a.id}">
+      <span class="mini-av" style="background:${a.color}">${esc(a.short)}<span class="sd" style="background:${st.color}"></span></span>
+      ${esc(a.name)}<span class="sub">${esc(a.model || a.cli)}</span></button>`;
+  }).join('');
+}
+dmList.addEventListener('click', e => { const b = e.target.closest('[data-id]'); if (b) { setTarget(b.dataset.id); select(b.dataset.id); } });
+$('#roomItem').onclick = () => setTarget(null);
+
+let target = null;
+function setTarget(id) {
+  target = id;
+  $('#roomItem').classList.toggle('active', !id);
+  const t = $('#target');
+  if (id) { const a = byId[id]; t.innerHTML = `Nhắn riêng: <span class="pill"><span class="mini-av" style="background:${a.color};width:18px;height:18px;font-size:8px">${esc(a.short)}</span>${esc(a.name)}<button type="button" aria-label="Bỏ nhắn riêng">✕</button></span>`; t.querySelector('button').onclick = () => setTarget(null); $('#msg').placeholder = `Nhắn riêng cho ${a.name}…`; }
+  else { t.innerHTML = ''; $('#msg').placeholder = 'Giao việc cho Leader…'; }
+  refreshDMs(); $('#msg').focus();
+}
+
+function updateUsage() {
+  let tok = 0, cost = 0; Object.values(robots).forEach(r => { tok += r.tokens; cost += r.cost; });
+  $('#tokNum').textContent = tok.toLocaleString('vi-VN');
+  $('#costNote').textContent = `Quy đổi giá API: $${cost.toFixed(2)} · chạy bằng gói thuê bao`;
+}
+
+// markdown
+function inline(s) {
+  return s.replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+}
+function md(src) {
+  const blocks = [];
+  let text = esc(src).replace(/```([\w+-]*)\n?([\s\S]*?)```/g, (_, lang, code) => { blocks.push(`<pre><div class="ch"><span>${lang || 'code'}</span><button type="button" data-copy>Sao chép</button></div><code>${code.replace(/\n$/, '')}</code></pre>`); return `\u0000${blocks.length - 1}\u0000`; });
+  let out = '', list = null, para = [], table = [];
+  const fp = () => { if (para.length) { out += `<p>${inline(para.join('<br>'))}</p>`; para = []; } };
+  const fl = () => { if (list) { out += `</${list}>`; list = null; } };
+  const ft = () => { if (!table.length) return; const rows = table.filter(r => !/^\|?\s*:?-{2,}/.test(r)); const cells = r => r.replace(/^\||\|$/g, '').split('|').map(c => inline(c.trim())); out += '<table>' + rows.map((r, i) => '<tr>' + cells(r).map(c => i ? `<td>${c}</td>` : `<th>${c}</th>`).join('') + '</tr>').join('') + '</table>'; table = []; };
+  for (const raw of text.split('\n')) {
+    const line = raw.trimEnd(); let m;
+    if (/^\u0000\d+\u0000$/.test(line.trim())) { fp(); fl(); ft(); out += line.trim(); continue; }
+    if (/^\s*\|.*\|\s*$/.test(line)) { fp(); fl(); table.push(line.trim()); continue; } else ft();
+    if ((m = line.match(/^(#{1,4})\s+(.*)/))) { fp(); fl(); out += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`; continue; }
+    if ((m = line.match(/^&gt;\s?(.*)/))) { fp(); fl(); out += `<blockquote>${inline(m[1])}</blockquote>`; continue; }
+    if ((m = line.match(/^\s*[-*•]\s+(.*)/))) { fp(); if (list !== 'ul') { fl(); out += '<ul>'; list = 'ul'; } out += `<li>${inline(m[1])}</li>`; continue; }
+    if ((m = line.match(/^\s*\d+[.)]\s+(.*)/))) { fp(); if (list !== 'ol') { fl(); out += '<ol>'; list = 'ol'; } out += `<li>${inline(m[1])}</li>`; continue; }
+    if (!line.trim()) { fp(); fl(); continue; }
+    fl(); para.push(line);
+  }
+  fp(); fl(); ft();
+  return out.replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[i]);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-copy]'); if (!b) return;
+  navigator.clipboard?.writeText(b.closest('pre').querySelector('code').innerText).then(() => { b.textContent = 'Đã chép ✓'; setTimeout(() => b.textContent = 'Sao chép', 1500); }).catch(() => {});
+});
+
+const feed = $('#feed');
+const now = () => new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+const av = (a) => `<span class="mini-av" style="background:${a.color}">${esc(a.short)}</span>`;
+function push(el) { const near = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 200; feed.appendChild(el); if (near) feed.scrollTop = feed.scrollHeight; return el; }
+function node(html) { const w = document.createElement('div'); w.innerHTML = html; return w.firstElementChild; }
+function chatAgent(id, text, { kind = '', meta = '', tag = '' } = {}) {
+  const a = byId[id] || { name: id, short: '?', color: '#868e96' };
+  if (robots[id]) say(id, text);
+  const el = push(node(`<div class="m ${kind}">${av(a)}<div class="bd"><div class="t"><b style="color:${a.color}">${esc(a.name)}</b>${tag}<span>· ${now()}${meta ? ' · ' + esc(meta) : ''}</span></div><div class="x md">${md(text)}</div></div></div>`));
+  const x = el.querySelector('.x');
+  if (kind === 'res' && x.scrollHeight > 260) {
+    x.classList.add('clamp');
+    const b = document.createElement('button'); b.className = 'more'; b.type = 'button'; b.textContent = 'Xem toàn bộ ↓';
+    b.onclick = () => { const c = x.classList.toggle('clamp'); b.textContent = c ? 'Xem toàn bộ ↓' : 'Thu gọn ↑'; };
+    x.after(b);
+  }
+  return el;
+}
+const chatMe = (text) => push(node(`<div class="m me"><div class="x">${esc(text)}</div></div>`));
+const chatSys = (text, err) => push(node(`<div class="m sys ${err ? 'err' : ''}"><div class="x">${esc(text)}</div></div>`));
+const chatHand = (from, to, task) => push(node(`<div class="hand" title="${esc(task)}">${av(byId[from])}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8a8f9c" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>${av(byId[to])}<span><b>Giao ${esc(byId[to].name)}:</b> ${esc(task)}</span></div>`));
+
+/* card */
+let selected = null, follow = null;
+const card = $('#card');
+function select(id) {
+  if (selected && robots[selected]) { robots[selected].ring.visible = false; robots[selected].lab.el.classList.remove('sel'); }
+  selected = id;
+  if (!id) { card.classList.remove('show'); return; }
+  robots[id].ring.visible = true; robots[id].lab.el.classList.add('sel'); fillCard(); card.classList.add('show');
+}
+function fillCard() {
+  const r = robots[selected], a = r.s, s = STATE[r.state] || STATE.idle;
+  const big = $('#cAv'); big.textContent = a.short; big.style.background = a.color;
+  $('#cName').textContent = a.name; $('#cRole').textContent = a.title;
+  $('#cCli').textContent = a.cli; $('#cModel').textContent = a.model || '(mặc định)';
+  $('#cState').innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;color:${s.color}"><span style="width:8px;height:8px;border-radius:50%;background:${s.color}"></span>${s.label}</span>`;
+  $('#cTask').textContent = r.task || '—';
+  $('#cTok').textContent = r.tokens.toLocaleString('vi-VN') + (r.cost ? ` · ~$${r.cost.toFixed(3)}` : '');
+  $('#cWake').style.display = r.state === 'sleeping' ? '' : 'none';
+}
+$('#cClose').onclick = () => select(null);
+$('#cDm').onclick = () => setTarget(selected);
+$('#cFollow').onclick = () => { follow = follow === selected ? null : selected; $('#cFollow').textContent = follow ? 'Bỏ theo dõi' : 'Theo dõi'; };
+$('#cWake').onclick = async () => {
+  const id = selected; await fetch('/api/wake', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+  const r = robots[id]; freeBed(r); setRobotState(id, 'idle', 'Chưa có việc'); goHome(r); chatSys(`${r.s.name} đã được đánh thức.`);
+};
+
+const toastEl = $('#toast');
+function toast(t) { toastEl.textContent = t; toastEl.classList.add('show'); clearTimeout(toastEl._t); toastEl._t = setTimeout(() => toastEl.classList.remove('show'), 2400); }
+
+$('#chatMin').onclick = () => { const c = $('#chat'); c.classList.toggle('min'); $('#chatMin').textContent = c.classList.contains('min') ? '+' : '–'; };
+$('#chatBig').onclick = () => { const c = $('#chat'); c.classList.remove('min'); c.classList.toggle('big'); $('#chatBig').textContent = c.classList.contains('big') ? 'Thu nhỏ' : 'Phóng to'; feed.scrollTop = feed.scrollHeight; };
+$('#newRoom').onclick = async () => {
+  if (running) return toast('Đợi phòng làm xong việc hiện tại đã nhé');
+  await fetch('/api/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ room_id: roomId }) }).catch(() => {});
+  roomId = Math.random().toString(36).slice(2); try { localStorage.setItem('roomai.room', roomId); } catch {}
+  feed.innerHTML = ''; wbLines.length = 0; drawWB(); chatSys('Bắt đầu cuộc trò chuyện mới.');
+};
+
+/* camera */
+const CAMS = {
+  overview: [new THREE.Vector3(27, 24, 29), new THREE.Vector3(-1, 0, -1)],
+  meeting: [new THREE.Vector3(26, 13, 4), new THREE.Vector3(16.5, 1, -9.5)],
+  nap: [new THREE.Vector3(-3, 12, 22), new THREE.Vector3(-16, 0, 7.5)],
+};
+let camAnim = null;
+function flyCam(p, t) { camAnim = { p0: camera.position.clone(), t0: controls.target.clone(), p1: p.clone(), t1: t.clone(), k: 0 }; }
+document.querySelectorAll('[data-cam]').forEach(b => b.onclick = () => { follow = null; flyCam(...CAMS[b.dataset.cam]); });
+const autoBtn = $('#autoBtn');
+autoBtn.onclick = () => { controls.autoRotate = !controls.autoRotate; autoBtn.classList.toggle('on', controls.autoRotate); };
+addEventListener('keydown', e => {
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || $('#modal').classList.contains('show')) { if (e.key === 'Escape') $('#modal').classList.remove('show'); return; }
+  const k = e.key.toLowerCase();
+  if (k === 'o') flyCam(...CAMS.overview); else if (k === 'm') flyCam(...CAMS.meeting); else if (k === 'n') flyCam(...CAMS.nap);
+  else if (k === 'r') autoBtn.click(); else if (k === 'c') $('#chatMin').click(); else if (k === 'escape') select(null);
+});
+
+/* picking */
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+let downAt = null;
+const setMouse = e => { const rc = renderer.domElement.getBoundingClientRect(); mouse.set(((e.clientX - rc.left) / rc.width) * 2 - 1, -((e.clientY - rc.top) / rc.height) * 2 + 1); ray.setFromCamera(mouse, camera); };
+renderer.domElement.addEventListener('pointerdown', e => downAt = [e.clientX, e.clientY]);
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+  setMouse(e); const hit = ray.intersectObjects(clickables, false)[0]; select(hit ? hit.object.userData.id : null);
+});
+renderer.domElement.addEventListener('pointermove', e => { setMouse(e); renderer.domElement.style.cursor = ray.intersectObjects(clickables, false).length ? 'pointer' : ''; });
+
+/* ================= backend ================= */
+let running = false, pendingAsk = null;
+function setRunning(v) { running = v; $('#sendBtn').disabled = v && !pendingAsk; }
+
+function handle(ev) {
+  const r = robots[ev.member];
+  switch (ev.type) {
+    case 'status':
+      if (!r) break;
+      setRobotState(ev.member, ev.state, ev.task);
+      if (ev.state === 'meeting') goMeeting(r);
+      else if (ev.state !== 'sleeping') { r.wander = false; goHome(r); }
+      if (ev.state === 'working' && ev.task) addWB(ev.member, ev.task);
+      break;
+    case 'meeting':
+      ev.members.forEach(id => robots[id] && goMeeting(robots[id]));
+      flyCam(...CAMS.meeting);
+      break;
+    case 'meeting_end':
+      Object.values(robots).forEach(x => { if (x.meet) goHome(x); });
+      break;
+    case 'handoff':
+      chatHand(ev.from, ev.to, ev.task); say(ev.from, 'Giao cho ' + (byId[ev.to]?.name || ev.to)); ticket(ev.from, ev.to);
+      break;
+    case 'say':
+      chatAgent(ev.member, ev.text, { tag: ev.dm ? '<span class="tag" style="background:#f4f1ea;color:#5b6070">riêng</span>' : '' });
+      break;
+    case 'result':
+      chatAgent(ev.member, ev.ok ? ev.text : 'Lỗi: ' + ev.text, { kind: 'res', meta: (ev.ms / 1000).toFixed(1) + 's' + (ev.ok ? '' : ' · lỗi') });
+      doneWB(ev.member);
+      break;
+    case 'usage':
+      if (r) { r.tokens += ev.tokens || 0; r.cost += ev.cost || 0; updateUsage(); if (selected === ev.member) fillCard(); }
+      break;
+    case 'ask': {
+      setRobotState(ev.member, 'waiting', 'Chờ bạn trả lời');
+      const el = chatAgent(ev.member, ev.question);
+      const q = document.createElement('div'); q.className = 'quick';
+      q.innerHTML = (ev.options || []).map(o => `<button type="button">${esc(o)}</button>`).join('');
+      el.querySelector('.x').after(q);
+      pendingAsk = (ans) => { pendingAsk = null; q.querySelectorAll('button').forEach(b => b.disabled = true); chatMe(ans); $('#sendBtn').disabled = true; $('#msg').placeholder = 'Giao việc cho Leader…';
+        fetch('/api/answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ room_id: roomId, answer: ans }) }); };
+      q.querySelectorAll('button').forEach(b => b.onclick = () => pendingAsk && pendingAsk(b.textContent));
+      $('#sendBtn').disabled = false; $('#msg').placeholder = 'Trả lời câu hỏi của Leader (hoặc bấm một lựa chọn)…';
+      break;
+    }
+    case 'sleep':
+      if (r) { setRobotState(ev.member, 'sleeping', ev.text); goSleep(r); }
+      break;
+    case 'final':
+      chatAgent(ev.member, ev.text, { kind: 'final', tag: '<span class="tag" style="background:#ffe8d6;color:#a63e06">CHỐT</span>' });
+      wbLines.forEach(l => l.done = true); drawWB();
+      break;
+    case 'sys': chatSys(ev.text); break;
+    case 'error': chatSys(ev.text, true); break;
+  }
+}
+function addWB(id, task) { const a = byId[id]; if (!a || a.role === 'leader') return; wbLines.push({ id, text: `${a.short}: ${task}`, color: a.color, done: false }); drawWB(); }
+function doneWB(id) { for (let i = wbLines.length - 1; i >= 0; i--) if (wbLines[i].id === id && !wbLines[i].done) { wbLines[i].done = true; break; } drawWB(); }
+
+async function send(text) {
+  setRunning(true);
+  chatMe(target ? `@${byId[target].name} ${text}` : text);
+  try {
+    const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ room_id: roomId, message: text, to: target }) });
+    const reader = res.body.getReader(), dec = new TextDecoder(); let buf = '';
+    while (true) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); let i;
+      while ((i = buf.indexOf('\n\n')) >= 0) {
+        const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+        const data = chunk.split('\n').filter(l => l.startsWith('data:')).map(l => l.slice(5).trimStart()).join('\n');
+        if (data) { try { handle(JSON.parse(data)); } catch (e) { console.error(e); } }
+      }
+    }
+  } catch (e) { chatSys('Mất kết nối tới server: ' + e.message, true); }
+  finally { pendingAsk = null; setRunning(false); $('#msg').placeholder = target ? `Nhắn riêng cho ${byId[target].name}…` : 'Giao việc cho Leader…'; }
+}
+$('#form').addEventListener('submit', e => {
+  e.preventDefault();
+  const t = $('#msg').value.trim(); if (!t) return;
+  if (pendingAsk) { $('#msg').value = ''; pendingAsk(t); return; }
+  if (running) return toast('Phòng đang làm việc, đợi xong lượt này nhé');
+  $('#msg').value = ''; send(t);
+});
+$('#msg').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('#form').requestSubmit(); } });
+
+/* idle wandering */
+setInterval(() => {
+  if (running) return;
+  const free = Object.values(robots).filter(r => r.state === 'idle' && !r.path.length && !r.wander && !r.lying);
+  if (!free.length || Math.random() < 0.4) return;
+  const r = free[Math.floor(Math.random() * free.length)], spot = coffeeSpots[Math.floor(Math.random() * coffeeSpots.length)];
+  r.wander = true;
+  walkTo(r, spot).then(() => { say(r.s.id, ['Cà phê cái đã ☕', 'Nghỉ 5 phút', 'Ai uống gì không?'][Math.floor(Math.random() * 3)]); return sleep(5000); })
+    .then(() => { r.wander = false; if (r.state === 'idle') return goHome(r); });
+}, 9000);
+
+/* ================= seats modal ================= */
+const PALETTE = ['#e67700', '#c2255c', '#5f3dc4', '#1864ab', '#087f5b', '#5c940d', '#862e9c', '#0b7285'];
+let draft = [];
+function rowHtml(s, i) {
+  return `<tr data-i="${i}">
+    <td><input type="color" value="${s.color}" data-k="color" aria-label="Màu"></td>
+    <td><input type="text" value="${esc(s.name)}" data-k="name" aria-label="Tên"></td>
+    <td><select data-k="role" aria-label="Vai trò">${['leader', 'pm', 'tester', 'senior', 'dev'].map(r => `<option ${r === s.role ? 'selected' : ''}>${r}</option>`).join('')}</select></td>
+    <td><input type="text" value="${esc(s.title)}" data-k="title" aria-label="Chức danh"></td>
+    <td><select data-k="cli" aria-label="CLI">${['claude', 'codex', 'gemini'].map(c => `<option ${c === s.cli ? 'selected' : ''}>${c}</option>`).join('')}</select></td>
+    <td><input type="text" class="mono" value="${esc(s.model)}" data-k="model" placeholder="mặc định" aria-label="Model"></td>
+    <td class="chk"><input type="checkbox" ${s.enabled ? 'checked' : ''} data-k="enabled" aria-label="Bật"></td>
+    <td class="chk" id="chk-${s.id}">—</td>
+    <td>${s.role === 'leader' ? '' : `<button type="button" class="btn" data-del="${i}" style="padding:6px 10px">Xoá</button>`}</td></tr>`;
+}
+function renderRows() { $('#seatRows').innerHTML = draft.map(rowHtml).join(''); }
+$('#seatRows').addEventListener('input', e => {
+  const tr = e.target.closest('tr'), k = e.target.dataset.k; if (!tr || !k) return;
+  draft[+tr.dataset.i][k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+});
+$('#seatRows').addEventListener('click', e => { const d = e.target.closest('[data-del]'); if (d) { draft.splice(+d.dataset.del, 1); renderRows(); } });
+$('#openSeats').onclick = () => { draft = SEATS.map(x => ({ ...x.seat })); renderRows(); $('#modal').classList.add('show'); };
+$('#closeSeats').onclick = () => $('#modal').classList.remove('show');
+$('#addDev').onclick = () => {
+  if (draft.length >= 9) return toast('Văn phòng có tối đa 8 bàn + phòng Leader');
+  let n = 1; while (draft.some(s => s.id === 'dev' + n)) n++;
+  draft.push({ id: 'dev' + n, name: 'Dev ' + n, short: 'D' + n, role: 'dev', title: 'Developer', job: 'Viết code theo task', cli: 'claude', model: 'claude-sonnet-5-5', color: PALETTE[n % PALETTE.length], enabled: true });
+  renderRows();
+};
+$('#checkBtn').onclick = async () => {
+  const b = $('#checkBtn'); b.disabled = true; b.textContent = 'Đang kiểm tra…';
+  draft.forEach(s => { const c = document.getElementById('chk-' + s.id); if (c) c.textContent = '…'; });
+  try {
+    const r = await fetch('/api/check', { method: 'POST' }).then(r => r.json());
+    r.results.forEach(x => { const c = document.getElementById('chk-' + x.id); if (c) c.innerHTML = x.ok ? `<span class="ok" title="${esc(x.text)}">✓ ${(x.ms / 1000).toFixed(1)}s</span>` : `<span class="no" title="${esc(x.text)}">✗ ${esc(x.text.slice(0, 60))}</span>`; });
+  } catch (e) { toast('Không kiểm tra được: ' + e.message); }
+  b.disabled = false; b.textContent = 'Kiểm tra kết nối';
+};
+$('#saveSeats').onclick = async () => {
+  draft.forEach(s => { s.short = s.short || (s.name.match(/\b\w/g) || ['?']).join('').slice(0, 2).toUpperCase(); s.job = s.job || 'Viết code theo task'; });
+  const r = await fetch('/api/seats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }));
+  if (!r.ok) return toast(r.error || 'Lưu không được');
+  location.reload();
+};
+
+/* ================= boot ================= */
+async function boot() {
+  let data;
+  try { data = await fetch('/api/seats').then(r => r.json()); $('#online').classList.remove('off'); }
+  catch { $('#online').classList.add('off'); chatSys('Không kết nối được server Rust. Hãy chạy `cargo run --release` rồi tải lại trang.', true); return; }
+  SEATS = data.seats; byId = Object.fromEntries(SEATS.map(x => [x.seat.id, x.seat]));
+  $('#who').textContent = `· ${SEATS.length} AI`;
+  $('#clis').innerHTML = ['claude', 'codex', 'gemini'].map(n => { const c = data.clis[n] || {}; return `<div><span>${n}</span>${c.version ? `<code class="ok" title="${esc(c.path || '')}">${esc(c.version)}</code>` : '<span class="no">chưa cài</span>'}</div>`; }).join('');
+  let slot = 0;
+  SEATS.forEach(x => {
+    const s = x.seat, r = makeRobot(s); robots[s.id] = r;
+    r.home = s.role === 'leader' ? leaderSpot : (deskSlots[slot++] || deskSlots[deskSlots.length - 1]);
+    r.g.position.copy(r.home.seat); r.face = r.home.face; r.g.rotation.y = r.home.face; r.sitting = true;
+    r.tokens = x.tokens || 0; r.cost = x.cost || 0;
+    setRobotState(s.id, x.state, x.state === 'sleeping' ? x.sleep_text : x.task);
+    if (x.state === 'sleeping') goSleep(r, true);
+  });
+  updateUsage(); refreshDMs();
+  const missing = ['claude', 'codex', 'gemini'].filter(n => !data.clis[n]?.version && SEATS.some(x => x.seat.cli === n));
+  chatSys('Chào sếp! Cả phòng đã vào chỗ. Gửi yêu cầu cho Leader, hoặc chọn một AI ở cột trái để nhắn riêng.');
+  if (missing.length) chatSys(`Máy chưa có: ${missing.join(', ')}. Các AI dùng CLI đó sẽ đứng xám. Cài và đăng nhập rồi mở lại app (xem README).`, true);
+}
+
+function resize() { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); labelRenderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+
+const clock = new THREE.Clock();
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  for (const r of Object.values(robots)) {
+    const g = r.g;
+    if (r.path.length) {
+      const tg = r.path[0], d = tg.clone().sub(g.position); d.y = 0;
+      const dist = d.length(), step = 4.2 * dt;
+      if (dist <= step) { g.position.x = tg.x; g.position.z = tg.z; r.path.shift(); if (!r.path.length && r.onArrive) { const f = r.onArrive; r.onArrive = null; f(); } }
+      else { d.normalize(); g.position.addScaledVector(d, step); const want = Math.atan2(d.x, d.z); g.rotation.y += ((want - g.rotation.y + Math.PI * 3) % (Math.PI * 2) - Math.PI) * Math.min(1, dt * 12); }
+      r.body.position.y = Math.abs(Math.sin(t * 11)) * 0.12;
+      r.armL.rotation.x = Math.sin(t * 11) * 0.7; r.armR.rotation.x = -Math.sin(t * 11) * 0.7; r.legs.visible = true;
+    } else if (r.lying) {
+      g.rotation.y = 0; r.body.rotation.set(0, 0, Math.PI / 2); r.body.position.set(0, 1.25, 0); r.body.scale.y = 1 + Math.sin(t * 1.5) * 0.02;
+      r.armL.rotation.x = 0; r.armR.rotation.x = 0;
+    } else {
+      g.rotation.y += ((r.face - g.rotation.y + Math.PI * 3) % (Math.PI * 2) - Math.PI) * Math.min(1, dt * 8);
+      r.legs.visible = !r.sitting; r.body.position.y = r.sitting ? 0.2 : 0; r.body.scale.y = 1 + Math.sin(t * 2 + g.position.x) * 0.015;
+      if (r.state === 'working') {
+        r.armL.rotation.x = -0.9 + Math.sin(t * 18) * 0.2; r.armR.rotation.x = -0.9 + Math.cos(t * 18) * 0.2;
+        r.head.rotation.x = 0.1 + Math.sin(t * 3) * 0.04; r.bulbMat.emissiveIntensity = 0.8 + Math.sin(t * 6) * 0.6;
+      } else if (r.state === 'meeting') {
+        r.armL.rotation.x = 0; r.armR.rotation.x = Math.sin(t * 2) * 0.3 - 0.2; r.head.rotation.y = Math.sin(t * 0.8 + g.position.x) * 0.35; r.head.rotation.x = 0; r.bulbMat.emissiveIntensity = 0.9;
+      } else if (r.state === 'waiting') {
+        r.armR.rotation.x = -2.6 + Math.sin(t * 5) * 0.25; r.armL.rotation.x = 0; r.head.rotation.x = -0.1; r.bulbMat.emissiveIntensity = 0.6 + Math.abs(Math.sin(t * 4));
+      } else {
+        r.armL.rotation.x *= 0.9; r.armR.rotation.x *= 0.9; r.head.rotation.x *= 0.9; r.head.rotation.y *= 0.95; r.bulbMat.emissiveIntensity = 0.5;
+      }
+    }
+  }
+  for (let i = flights.length - 1; i >= 0; i--) {
+    const f = flights[i]; f.t += dt / 1.1; const k = Math.min(1, f.t);
+    f.m.position.lerpVectors(f.from, f.to, k); f.m.position.y += Math.sin(k * Math.PI) * 3.5; f.m.rotation.y += dt * 8;
+    if (k >= 1) { scene.remove(f.m); flights.splice(i, 1); f.res(); }
+  }
+  if (camAnim) {
+    camAnim.k = Math.min(1, camAnim.k + dt / 1.1); const e = 1 - Math.pow(1 - camAnim.k, 3);
+    camera.position.lerpVectors(camAnim.p0, camAnim.p1, e); controls.target.lerpVectors(camAnim.t0, camAnim.t1, e);
+    if (camAnim.k >= 1) camAnim = null;
+  } else if (follow && robots[follow]) { const p = robots[follow].g.position; controls.target.lerp(new THREE.Vector3(p.x, 1, p.z), 0.08); }
+  controls.update(); renderer.render(scene, camera); labelRenderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+boot().then(() => { tick(); $('#msg').focus(); });
+setInterval(async () => { try { await fetch('/api/seats', { method: 'GET' }); $('#online').classList.remove('off'); } catch { $('#online').classList.add('off'); } }, 15000);
+</script>
+</body>
+</html>
