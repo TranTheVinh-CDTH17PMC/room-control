@@ -26,6 +26,18 @@ if errorlevel 1 (
 )
 
 echo.
+echo [+] Cong cu cho Video Editor: Python, pycapcut, ffmpeg
+where python >nul 2>nul
+if errorlevel 1 (
+  echo     Chua co Python, dang cai bang winget...
+  winget install -e --id Python.Python.3.12 --accept-package-agreements --accept-source-agreements
+  echo     Cai Python xong. Neu buoc pip ben duoi loi, dong cua so va chay lai file nay.
+)
+call python -m pip install --upgrade pycapcut
+where ffmpeg >nul 2>nul
+if errorlevel 1 winget install -e --id Gyan.FFmpeg --accept-package-agreements --accept-source-agreements
+
+echo.
 echo [2/2] Dang nhap tung CLI (lam 1 lan duy nhat)
 echo.
 echo --- Claude: trinh duyet se mo de dang nhap tai khoan Claude.

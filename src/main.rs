@@ -56,6 +56,9 @@ pub struct Seat {
     pub color: String,
     #[serde(default = "yes")]
     pub enabled: bool,
+    /// cho phép chạy công cụ (lệnh, ghi file) — dùng cho Video Editor
+    #[serde(default)]
+    pub tools: bool,
 }
 fn yes() -> bool {
     true
@@ -64,9 +67,9 @@ fn yes() -> bool {
 fn default_seats() -> Vec<Seat> {
     let s = |id: &str, name: &str, short: &str, role: &str, title: &str, job: &str, cli: &str, model: &str, color: &str| Seat {
         id: id.into(), name: name.into(), short: short.into(), role: role.into(), title: title.into(),
-        job: job.into(), cli: cli.into(), model: model.into(), color: color.into(), enabled: true,
+        job: job.into(), cli: cli.into(), model: model.into(), color: color.into(), enabled: true, tools: false,
     };
-    vec![
+    let mut v = vec![
         s("leader", "Leader", "LD", "leader", "Trưởng phòng", "Nhận yêu cầu, chia việc, chốt kết quả", "claude", "claude-opus-5-5", "#e8590c"),
         s("pm", "PM", "PM", "pm", "Product Manager", "Viết user story, tiêu chí nghiệm thu, làm rõ yêu cầu", "claude", "claude-opus-4-8", "#7048e8"),
         s("tester", "Tester", "QA", "tester", "QA Tester", "Viết test case, tìm bug, xác nhận bản sửa", "claude", "claude-opus-4-8", "#d6336c"),
@@ -74,7 +77,18 @@ fn default_seats() -> Vec<Seat> {
         s("dev1", "Dev Sonnet", "D1", "dev", "Developer", "Viết code theo task", "claude", "claude-sonnet-5-5", "#0c8599"),
         s("dev2", "Dev GPT", "D2", "dev", "Developer", "Viết code theo task", "codex", "", "#2b8a3e"),
         s("dev3", "Dev Gemini", "D3", "dev", "Developer", "Viết code theo task", "gemini", "", "#3b5bdb"),
-    ]
+    ];
+    v.push(editor_seat());
+    v
+}
+
+pub fn editor_seat() -> Seat {
+    Seat {
+        id: "editor".into(), name: "Video Editor".into(), short: "VE".into(), role: "editor".into(),
+        title: "Video Editor".into(),
+        job: "Dựng video: cắt ghép, chữ, nhạc, phụ đề, chuyển cảnh; tạo project CapCut".into(),
+        cli: "claude".into(), model: "claude-sonnet-5-5".into(), color: "#f76707".into(), enabled: true, tools: true,
+    }
 }
 
 #[derive(Clone, Default, Serialize)]
@@ -102,6 +116,7 @@ pub struct AppState {
     answers: Mutex<HashMap<String, oneshot::Sender<String>>>,
     seats_path: PathBuf,
     pub workdir: PathBuf,
+    video: prompts::VideoEnv,
     max_rounds: usize,
     sleep_minutes: u64,
 }
@@ -126,6 +141,14 @@ async fn main() {
             d
         });
 
+    // thêm Video Editor cho seats.json cũ
+    let mut seats = seats;
+    if !seats.iter().any(|s| s.role == "editor") {
+        seats.push(editor_seat());
+        let _ = std::fs::write(&seats_path, serde_json::to_string_pretty(&seats).unwrap());
+    }
+    let video = prompts::VideoEnv::detect(&base, &workdir);
+
     let port: u16 = env::var("PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(3000);
     let max_rounds = env::var("MAX_ROUNDS").ok().and_then(|p| p.parse().ok()).unwrap_or(8);
 
@@ -137,6 +160,12 @@ async fn main() {
             Some(v) => println!("  {name:<8} ✓ {v}"),
             None => println!("  {name:<8} ✗ chưa cài (hoặc không có trong PATH)"),
         }
+    }
+    println!("  video    đầu vào: {}", video.input.display());
+    if video.drafts_found {
+        println!("  capcut   ✓ {}", video.drafts.display());
+    } else {
+        println!("  capcut   ✗ chưa thấy thư mục draft (mở CapCut 1 lần, hoặc đặt CAPCUT_DRAFTS)");
     }
 
     let mut rt = HashMap::new();
@@ -152,6 +181,7 @@ async fn main() {
         answers: Mutex::new(HashMap::new()),
         seats_path,
         workdir,
+        video,
         max_rounds,
         sleep_minutes: 30,
     });
@@ -168,6 +198,7 @@ async fn main() {
         .route("/api/check", post(check))
         .route("/api/wake", post(wake))
         .route("/api/reset", post(reset))
+        .route("/api/open-folder", post(open_folder))
         .with_state(state);
 
     let url = format!("http://localhost:{port}");
@@ -248,7 +279,7 @@ async fn put_to_sleep(st: &AppState, tx: &Tx, seat: &Seat, hint: &str) {
 /// Chạy 1 thành viên; tự cập nhật token, chi phí, ngủ khi hết hạn mức.
 async fn run_seat(st: &AppState, tx: &Tx, seat: &Seat, prompt: &str) -> Result<String, String> {
     let started = Instant::now();
-    match cli::run(&st.workdir, seat, prompt).await {
+    match cli::run(&st.workdir, seat, prompt, &st.video.dirs_for(seat)).await {
         Ok(out) => {
             {
                 let mut rt = st.rt.lock().await;
@@ -287,7 +318,7 @@ async fn seats_view(st: &AppState) -> Value {
             })
         })
         .collect();
-    json!({ "seats": list, "clis": clis, "workdir": st.workdir.display().to_string() })
+    json!({ "seats": list, "clis": clis, "workdir": st.workdir.display().to_string(), "video": st.video.view() })
 }
 
 async fn get_seats(State(st): State<Shared>) -> Json<Value> {
@@ -320,7 +351,7 @@ async fn check(State(st): State<Shared>) -> Json<Value> {
         let s = s.clone();
         async move {
             let started = Instant::now();
-            let r = cli::run(&st.workdir, &s, "Đây là bài kiểm tra kết nối. Chỉ trả lời đúng một từ: OK").await;
+            let r = cli::run(&st.workdir, &s, "Đây là bài kiểm tra kết nối. Chỉ trả lời đúng một từ: OK", &[]).await;
             let ms = started.elapsed().as_millis() as u64;
             match r {
                 Ok(o) => json!({"id": s.id, "ok": true, "text": o.text.chars().take(80).collect::<String>(), "ms": ms}),
@@ -354,6 +385,27 @@ struct RoomReq {
 async fn reset(State(st): State<Shared>, Json(req): Json<RoomReq>) -> Json<Value> {
     st.rooms.lock().await.remove(&req.room_id);
     Json(json!({"ok": true}))
+}
+
+#[derive(Deserialize)]
+struct FolderReq {
+    which: String,
+}
+async fn open_folder(State(st): State<Shared>, Json(req): Json<FolderReq>) -> Json<Value> {
+    let dir = match req.which.as_str() {
+        "input" => st.video.input.clone(),
+        "output" => st.video.output.clone(),
+        "drafts" => st.video.drafts.clone(),
+        _ => st.workdir.clone(),
+    };
+    let _ = std::fs::create_dir_all(&dir);
+    #[cfg(windows)]
+    let r = std::process::Command::new("explorer").arg(&dir).spawn();
+    #[cfg(target_os = "macos")]
+    let r = std::process::Command::new("open").arg(&dir).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let r = std::process::Command::new("xdg-open").arg(&dir).spawn();
+    Json(json!({"ok": r.is_ok(), "path": dir.display().to_string()}))
 }
 
 #[derive(Deserialize)]
@@ -408,7 +460,7 @@ async fn run_direct(st: &Shared, room_id: &str, to: &str, message: &str, tx: &Tx
         return;
     }
     let history = st.rooms.lock().await.get(room_id).cloned().unwrap_or_default();
-    let prompt = prompts::direct(&seat, message, &render_history(&history, 12));
+    let prompt = prompts::direct(&seat, message, &render_history(&history, 12), &st.video);
     set_state(st, tx, to, "working", "Trả lời tin nhắn riêng").await;
     let res = run_seat(st, tx, &seat, prompt.as_str()).await;
     match res {
@@ -580,7 +632,7 @@ async fn run_leader(st: &Shared, room_id: &str, message: &str, tx: &Tx) {
                 let ctx = render_history(&history, 6);
                 async move {
                     let started = Instant::now();
-                    let prompt = prompts::worker(&seat, &task, &ctx);
+                    let prompt = prompts::worker(&seat, &task, &ctx, &st.video);
                     let res = run_seat(&st, &tx, &seat, &prompt).await;
                     (seat, task, res, started.elapsed().as_millis() as u64)
                 }

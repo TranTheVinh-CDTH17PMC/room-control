@@ -80,7 +80,7 @@ fn command(path: &Path) -> Command {
     c
 }
 
-pub async fn run(workdir: &Path, seat: &Seat, prompt: &str) -> Result<CliOut, CliErr> {
+pub async fn run(workdir: &Path, seat: &Seat, prompt: &str, add_dirs: &[PathBuf]) -> Result<CliOut, CliErr> {
     let Some(bin) = resolve(&seat.cli) else {
         return Err(CliErr { message: format!("Chưa cài `{}` (không thấy trong PATH).", seat.cli), rate_limited: false, reset_hint: String::new() });
     };
@@ -95,11 +95,24 @@ pub async fn run(workdir: &Path, seat: &Seat, prompt: &str) -> Result<CliOut, Cl
             if !model.is_empty() {
                 cmd.args(["--model", model]);
             }
+            if seat.tools {
+                cmd.args(["--allowedTools", "Bash,Read,Write,Edit,Glob,Grep"]);
+                for d in add_dirs {
+                    cmd.arg("--add-dir").arg(d);
+                }
+            }
         }
         "codex" => {
             let f = std::env::temp_dir().join(format!("roomai-codex-{}-{}.txt", seat.id, std::process::id()));
             let _ = std::fs::remove_file(&f);
-            cmd.args(["exec", "--skip-git-repo-check", "--sandbox", "read-only", "--output-last-message"]);
+            let sandbox = if seat.tools { "workspace-write" } else { "read-only" };
+            cmd.args(["exec", "--skip-git-repo-check", "--sandbox", sandbox]);
+            if seat.tools {
+                for d in add_dirs {
+                    cmd.arg("--add-dir").arg(d);
+                }
+            }
+            cmd.arg("--output-last-message");
             cmd.arg(&f);
             if !model.is_empty() {
                 cmd.args(["-m", model]);
@@ -111,6 +124,13 @@ pub async fn run(workdir: &Path, seat: &Seat, prompt: &str) -> Result<CliOut, Cl
             if !model.is_empty() {
                 cmd.args(["-m", model]);
             }
+            if seat.tools {
+                cmd.arg("--yolo");
+                if !add_dirs.is_empty() {
+                    let list: Vec<String> = add_dirs.iter().map(|d| d.display().to_string()).collect();
+                    cmd.arg("--include-directories").arg(list.join(","));
+                }
+            }
         }
         other => return Err(err(format!("CLI không hỗ trợ: {other}"))),
     }
@@ -121,10 +141,11 @@ pub async fn run(workdir: &Path, seat: &Seat, prompt: &str) -> Result<CliOut, Cl
         let _ = stdin.write_all(prompt.as_bytes()).await;
         let _ = stdin.shutdown().await;
     }
-    let output = match tokio::time::timeout(Duration::from_secs(TIMEOUT_SECS), child.wait_with_output()).await {
+    let limit = if seat.tools { TIMEOUT_SECS * 2 } else { TIMEOUT_SECS };
+    let output = match tokio::time::timeout(Duration::from_secs(limit), child.wait_with_output()).await {
         Ok(Ok(o)) => o,
         Ok(Err(e)) => return Err(err(format!("Lỗi khi chạy {}: {e}", seat.cli))),
-        Err(_) => return Err(err(format!("{} chạy quá {} phút, đã dừng.", seat.cli, TIMEOUT_SECS / 60))),
+        Err(_) => return Err(err(format!("{} chạy quá {} phút, đã dừng.", seat.cli, limit / 60))),
     };
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();

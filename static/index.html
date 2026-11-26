@@ -40,6 +40,10 @@
   .clis div { display: flex; justify-content: space-between; gap: 8px; }
   .clis code { font-family: var(--mono); font-size: 11.5px; }
   .ok { color: #2b8a3e; font-weight: 600; } .no { color: #c92a2a; font-weight: 600; }
+  .vbox { margin: 4px 18px 8px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+  .vbox button { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 7px 10px; cursor: pointer; font-weight: 600; color: var(--ink); text-align: left; }
+  .vbox button:hover { border-color: #f76707; color: #c2410c; }
+  .vbox small { color: var(--muted); line-height: 1.4; }
   .usage { margin: 10px 18px; padding: 12px; border-radius: 14px; background: #fff8ec; border: 1px solid #f4e3c3; }
   .usage b { font-size: 18px; }
   .usage small { color: #8a5300; display: block; font-size: 12px; }
@@ -217,6 +221,8 @@
     </div>
     <div class="sec"><h3>CLI trên máy</h3></div>
     <div class="clis" id="clis"></div>
+    <div class="sec"><h3>Video · CapCut</h3></div>
+    <div class="vbox" id="videoBox"></div>
     <div class="usage">
       <small>Token đã dùng (phiên này)</small>
       <b id="tokNum">0</b>
@@ -300,13 +306,14 @@
     <p class="sub">Mỗi vị trí chạy bằng một CLI đã đăng nhập trên máy. Để trống ô model để dùng model mặc định của CLI.</p>
     <div style="overflow-x:auto">
       <table class="grid">
-        <thead><tr><th></th><th>Tên</th><th>Vai trò</th><th>Chức danh</th><th>CLI</th><th>Model</th><th>Bật</th><th>Kiểm tra</th><th></th></tr></thead>
+        <thead><tr><th></th><th>Tên</th><th>Vai trò</th><th>Chức danh</th><th>CLI</th><th>Model</th><th>Bật</th><th title="Cho phép chạy lệnh và ghi file (cần cho Video Editor)">Công cụ</th><th>Kiểm tra</th><th></th></tr></thead>
         <tbody id="seatRows"></tbody>
       </table>
     </div>
     <div class="row">
       <div class="l">
         <button type="button" class="btn" id="addDev">+ Thêm Dev</button>
+        <button type="button" class="btn" id="addEditor">+ Thêm Video Editor</button>
         <button type="button" class="btn d" id="checkBtn">Kiểm tra kết nối</button>
       </div>
       <div class="r">
@@ -530,6 +537,18 @@ cyl(0.12, 0.1, 0.25, '#ffffff', 16.2, 1.42, 13.4, 12); cyl(0.12, 0.1, 0.25, '#e8
 plant(20.8, 13.5, 0.9); plant(-8.5, 13.5, 1.1); plant(9.5, -1.5, 0.8);
 const coffeeSpots = [[14.2, 11.4], [16.5, 11.4], [18.8, 11.4]].map(([x, z]) => ({ seat: new THREE.Vector3(x, 0, z), face: 0, sit: false }));
 zoneLabel('Góc cà phê', 16.5, 9.8);
+
+/* camera + clapperboard on a video editor's desk */
+function videoProps(spot) {
+  if (!spot || spot.propped) return; spot.propped = true;
+  const x = spot.seat.x + 1.7, z = spot.seat.z - 1.2;
+  [[-0.25, 0.2], [0.25, 0.2], [0, -0.3]].forEach(([dx, dz]) => { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6, 6), mat('#495057')); l.position.set(x + dx * 0.6, 0.8, z + dz * 0.6); l.rotation.z = dx * 0.35; l.rotation.x = -dz * 0.35; l.castShadow = true; scene.add(l); });
+  box(0.55, 0.38, 0.75, '#212529', x, 1.75, z);
+  cyl(0.15, 0.17, 0.3, '#343a40', x, 1.75, z + 0.48).rotation.x = Math.PI / 2;
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshStandardMaterial({ color: '#ff2d2d', emissive: '#ff2d2d', emissiveIntensity: 2 })); led.position.set(x + 0.2, 1.98, z + 0.3); scene.add(led);
+  box(0.5, 0.05, 0.35, '#1f2330', spot.seat.x + 0.7, 1.04, spot.seat.z - 1.05);
+  box(0.5, 0.06, 0.08, '#ffffff', spot.seat.x + 0.7, 1.1, spot.seat.z - 1.2);
+}
 
 /* ================= robots ================= */
 const robots = {}, clickables = [];
@@ -896,11 +915,12 @@ function rowHtml(s, i) {
   return `<tr data-i="${i}">
     <td><input type="color" value="${s.color}" data-k="color" aria-label="Màu"></td>
     <td><input type="text" value="${esc(s.name)}" data-k="name" aria-label="Tên"></td>
-    <td><select data-k="role" aria-label="Vai trò">${['leader', 'pm', 'tester', 'senior', 'dev'].map(r => `<option ${r === s.role ? 'selected' : ''}>${r}</option>`).join('')}</select></td>
+    <td><select data-k="role" aria-label="Vai trò">${['leader', 'pm', 'tester', 'senior', 'dev', 'editor'].map(r => `<option ${r === s.role ? 'selected' : ''}>${r}</option>`).join('')}</select></td>
     <td><input type="text" value="${esc(s.title)}" data-k="title" aria-label="Chức danh"></td>
     <td><select data-k="cli" aria-label="CLI">${['claude', 'codex', 'gemini'].map(c => `<option ${c === s.cli ? 'selected' : ''}>${c}</option>`).join('')}</select></td>
     <td><input type="text" class="mono" value="${esc(s.model)}" data-k="model" placeholder="mặc định" aria-label="Model"></td>
     <td class="chk"><input type="checkbox" ${s.enabled ? 'checked' : ''} data-k="enabled" aria-label="Bật"></td>
+    <td class="chk"><input type="checkbox" ${s.tools ? 'checked' : ''} data-k="tools" aria-label="Cho phép dùng công cụ"></td>
     <td class="chk" id="chk-${s.id}">—</td>
     <td>${s.role === 'leader' ? '' : `<button type="button" class="btn" data-del="${i}" style="padding:6px 10px">Xoá</button>`}</td></tr>`;
 }
@@ -915,7 +935,14 @@ $('#closeSeats').onclick = () => $('#modal').classList.remove('show');
 $('#addDev').onclick = () => {
   if (draft.length >= 9) return toast('Văn phòng có tối đa 8 bàn + phòng Leader');
   let n = 1; while (draft.some(s => s.id === 'dev' + n)) n++;
-  draft.push({ id: 'dev' + n, name: 'Dev ' + n, short: 'D' + n, role: 'dev', title: 'Developer', job: 'Viết code theo task', cli: 'claude', model: 'claude-sonnet-5-5', color: PALETTE[n % PALETTE.length], enabled: true });
+  draft.push({ id: 'dev' + n, name: 'Dev ' + n, short: 'D' + n, role: 'dev', title: 'Developer', job: 'Viết code theo task', cli: 'claude', model: 'claude-sonnet-5-5', color: PALETTE[n % PALETTE.length], enabled: true, tools: false });
+  renderRows();
+};
+$('#addEditor').onclick = () => {
+  if (draft.length >= 9) return toast('Văn phòng có tối đa 8 bàn + phòng Leader');
+  let n = 1; while (draft.some(s => s.id === (n === 1 ? 'editor' : 'editor' + n))) n++;
+  const id = n === 1 ? 'editor' : 'editor' + n;
+  draft.push({ id, name: n === 1 ? 'Video Editor' : 'Video Editor ' + n, short: 'V' + (n === 1 ? 'E' : n), role: 'editor', title: 'Video Editor', job: 'Dựng video: cắt ghép, chữ, nhạc, phụ đề, chuyển cảnh; tạo project CapCut', cli: 'claude', model: 'claude-sonnet-5-5', color: '#f76707', enabled: true, tools: true });
   renderRows();
 };
 $('#checkBtn').onclick = async () => {
@@ -952,6 +979,14 @@ async function boot() {
     if (x.state === 'sleeping') goSleep(r, true);
   });
   updateUsage(); refreshDMs();
+  const v = data.video || {};
+  $('#videoBox').innerHTML = `
+    <button type="button" data-open="input">📁 Bỏ video/ảnh/nhạc vào đây</button>
+    <button type="button" data-open="drafts" ${v.drafts_found ? '' : 'disabled title="Chưa thấy thư mục draft CapCut"'}>🎬 Mở thư mục draft CapCut</button>
+    <button type="button" data-open="output">📦 Thư mục xuất</button>
+    <small>${v.drafts_found ? '✓ Đã thấy CapCut trên máy' : '✗ Chưa thấy CapCut: mở CapCut một lần rồi chạy lại app'}</small>`;
+  $('#videoBox').onclick = async e => { const b = e.target.closest('[data-open]'); if (!b) return; const r = await fetch('/api/open-folder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ which: b.dataset.open }) }).then(r => r.json()).catch(() => ({})); if (r.path) toast('Đã mở: ' + r.path); };
+  Object.values(robots).filter(r => r.s.role === 'editor').forEach(r => videoProps(r.home));
   const missing = ['claude', 'codex', 'gemini'].filter(n => !data.clis[n]?.version && SEATS.some(x => x.seat.cli === n));
   chatSys('Chào sếp! Cả phòng đã vào chỗ. Gửi yêu cầu cho Leader, hoặc chọn một AI ở cột trái để nhắn riêng.');
   if (missing.length) chatSys(`Máy chưa có: ${missing.join(', ')}. Các AI dùng CLI đó sẽ đứng xám. Cài và đăng nhập rồi mở lại app (xem README).`, true);
