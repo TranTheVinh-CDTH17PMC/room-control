@@ -202,20 +202,53 @@ async fn main() {
         .route("/api/open-folder", post(open_folder))
         .with_state(state);
 
-    let url = format!("http://localhost:{port}");
-    let listener = match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
-        Ok(l) => l,
-        Err(e) => {
-            eprintln!("  Không mở được cổng {port}: {e}. Đặt biến PORT khác rồi chạy lại.");
-            std::process::exit(1);
+    // Cổng đang bận: nếu đó là Room Control AI đang chạy thì chỉ mở trình duyệt; không thì thử cổng kế tiếp.
+    let mut port = port;
+    let listener = loop {
+        match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
+            Ok(l) => break l,
+            Err(e) => {
+                if is_room_ai(port).await {
+                    let url = format!("http://localhost:{port}");
+                    println!("\n  App đã đang chạy sẵn ở {url} (cửa sổ cũ). Mở trình duyệt tới đó.");
+                    println!("  Muốn khởi động lại app: đóng cửa sổ cũ, hoặc chạy  taskkill /IM room-control-ai.exe /F\n");
+                    if env::var("NO_BROWSER").is_err() {
+                        open_browser(&url);
+                    }
+                    return;
+                }
+                if port >= 3010 {
+                    eprintln!("  Không mở được cổng nào từ 3000 tới 3010: {e}. Đặt biến PORT khác rồi chạy lại.");
+                    std::process::exit(1);
+                }
+                println!("  Cổng {port} đang bị chương trình khác dùng, thử cổng {}…", port + 1);
+                port += 1;
+            }
         }
     };
+    let url = format!("http://localhost:{port}");
     println!("  ───────────────────────────────────────────────");
     println!("  Mở trình duyệt: {url}\n");
     if env::var("NO_BROWSER").is_err() {
         open_browser(&url);
     }
     axum::serve(listener, app).await.unwrap();
+}
+
+/// Kiểm tra cổng đó có phải Room Control AI đang chạy không.
+async fn is_room_ai(port: u16) -> bool {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let Ok(Ok(mut s)) = tokio::time::timeout(Duration::from_secs(2), tokio::net::TcpStream::connect(("127.0.0.1", port))).await else {
+        return false;
+    };
+    let req = format!("GET /api/seats HTTP/1.1\r\nHost: localhost:{port}\r\nConnection: close\r\n\r\n");
+    if s.write_all(req.as_bytes()).await.is_err() {
+        return false;
+    }
+    let mut buf = vec![0u8; 4096];
+    let n = tokio::time::timeout(Duration::from_secs(3), s.read(&mut buf)).await.ok().and_then(|r| r.ok()).unwrap_or(0);
+    let head = String::from_utf8_lossy(&buf[..n]);
+    head.contains("200") && head.contains("\"seats\"")
 }
 
 fn open_browser(url: &str) {
