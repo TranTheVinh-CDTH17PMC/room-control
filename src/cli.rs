@@ -80,6 +80,17 @@ fn command(path: &Path) -> Command {
     c
 }
 
+/// Lỗi biết trước mà không cần gọi CLI (trả về thông báo nếu có).
+pub fn precheck(cli: &str) -> Option<String> {
+    if cli == "gemini" {
+        let has = |k: &str| std::env::var(k).map(|v| !v.trim().is_empty()).unwrap_or(false);
+        if !(has("GEMINI_API_KEY") || has("GOOGLE_API_KEY") || has("GOOGLE_GENAI_USE_VERTEXAI")) {
+            return Some("App chưa thấy GEMINI_API_KEY. Chạy setx GEMINI_API_KEY \"key\" rồi đóng hết cửa sổ và mở lại run.bat.".into());
+        }
+    }
+    None
+}
+
 pub async fn run(workdir: &Path, seat: &Seat, prompt: &str, add_dirs: &[PathBuf]) -> Result<CliOut, CliErr> {
     let Some(bin) = resolve(&seat.cli) else {
         return Err(CliErr { message: format!("Chưa cài `{}` (không thấy trong PATH).", seat.cli), rate_limited: false, reset_hint: String::new() });

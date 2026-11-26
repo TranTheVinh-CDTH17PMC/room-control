@@ -196,6 +196,7 @@ async fn main() {
         .route("/api/chat", post(chat))
         .route("/api/answer", post(answer))
         .route("/api/check", post(check))
+        .route("/api/check/{id}", post(check_one))
         .route("/api/wake", post(wake))
         .route("/api/reset", post(reset))
         .route("/api/open-folder", post(open_folder))
@@ -318,7 +319,7 @@ async fn seats_view(st: &AppState) -> Value {
             })
         })
         .collect();
-    json!({ "seats": list, "clis": clis, "workdir": st.workdir.display().to_string(), "video": st.video.view() })
+    json!({ "seats": list, "clis": clis, "gemini_key": cli::precheck("gemini").is_none(), "workdir": st.workdir.display().to_string(), "video": st.video.view() })
 }
 
 async fn get_seats(State(st): State<Shared>) -> Json<Value> {
@@ -361,6 +362,25 @@ async fn check(State(st): State<Shared>) -> Json<Value> {
     });
     let results = futures::future::join_all(futs).await;
     Json(json!({"results": results}))
+}
+
+/// Kiểm tra 1 vị trí, tối đa 60 giây.
+async fn check_one(State(st): State<Shared>, axum::extract::Path(id): axum::extract::Path<String>) -> Json<Value> {
+    let Some(s) = st.seats.read().await.iter().find(|s| s.id == id).cloned() else {
+        return Json(json!({"id": id, "ok": false, "text": "Không có vị trí này"}));
+    };
+    if let Some(msg) = cli::precheck(&s.cli) {
+        return Json(json!({"id": id, "ok": false, "text": msg, "ms": 0}));
+    }
+    let started = Instant::now();
+    let fut = cli::run(&st.workdir, &s, "Đây là bài kiểm tra kết nối. Chỉ trả lời đúng một từ: OK", &[]);
+    let r = tokio::time::timeout(Duration::from_secs(60), fut).await;
+    let ms = started.elapsed().as_millis() as u64;
+    Json(match r {
+        Ok(Ok(o)) => json!({"id": id, "ok": true, "text": o.text.chars().take(80).collect::<String>(), "ms": ms}),
+        Ok(Err(e)) => json!({"id": id, "ok": false, "text": e.message, "ms": ms}),
+        Err(_) => json!({"id": id, "ok": false, "ms": ms, "text": format!("{} không trả lời sau 60 giây (có thể đang chờ đăng nhập). Chạy `{}` trong terminal để xem nó hỏi gì.", s.cli, s.cli)}),
+    })
 }
 
 #[derive(Deserialize)]
