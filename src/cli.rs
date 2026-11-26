@@ -36,6 +36,9 @@ fn err(message: impl Into<String>) -> CliErr {
     CliErr { message, rate_limited, reset_hint }
 }
 
+/// Bản CLI đã chọn (bản mới nhất tìm thấy trên máy), điền bởi detect_all.
+static CHOSEN: std::sync::RwLock<Option<HashMap<String, PathBuf>>> = std::sync::RwLock::new(None);
+
 /// Tìm file thực thi (trên Windows: claude.cmd / claude.exe ...).
 /// Có thể ghi đè bằng biến môi trường CLAUDE_BIN / CODEX_BIN / GEMINI_BIN.
 pub fn resolve(name: &str) -> Option<PathBuf> {
@@ -45,26 +48,83 @@ pub fn resolve(name: &str) -> Option<PathBuf> {
             return Some(PathBuf::from(p));
         }
     }
+    if let Some(p) = CHOSEN.read().ok().and_then(|m| m.as_ref().and_then(|m| m.get(name).cloned())) {
+        return Some(p);
+    }
     which::which(name).ok()
+}
+
+/// Mọi bản của một CLI trên máy: trong PATH và các chỗ cài phổ biến.
+fn candidates(name: &str) -> Vec<PathBuf> {
+    let var = format!("{}_BIN", name.to_uppercase());
+    if let Ok(p) = std::env::var(&var) {
+        if !p.trim().is_empty() {
+            return vec![PathBuf::from(p)];
+        }
+    }
+    let mut v: Vec<PathBuf> = which::which_all(name).map(|it| it.collect()).unwrap_or_default();
+    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).map(PathBuf::from).ok();
+    let mut extra = vec![];
+    if let Some(h) = &home {
+        extra.push(h.join(".local").join("bin").join(if cfg!(windows) { format!("{name}.exe") } else { name.to_string() }));
+    }
+    if cfg!(windows) {
+        if let Ok(a) = std::env::var("APPDATA") {
+            extra.push(PathBuf::from(a).join("npm").join(format!("{name}.cmd")));
+        }
+    }
+    for e in extra {
+        if e.is_file() {
+            v.push(e);
+        }
+    }
+    let mut seen = std::collections::HashSet::new();
+    v.retain(|p| seen.insert(p.to_string_lossy().to_lowercase()));
+    v
+}
+
+fn parse_version(s: &str) -> Vec<u64> {
+    s.split(|c: char| !c.is_ascii_digit() && c != '.')
+        .find(|t| t.contains('.'))
+        .map(|t| t.split('.').filter_map(|x| x.parse().ok()).collect())
+        .unwrap_or_default()
+}
+
+async fn version_of(p: &Path) -> Option<String> {
+    let mut cmd = command(p);
+    cmd.arg("--version").stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let o = tokio::time::timeout(Duration::from_secs(20), cmd.output()).await.ok()?.ok()?;
+    if !o.status.success() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+    let s = if s.is_empty() { String::from_utf8_lossy(&o.stderr).trim().to_string() } else { s };
+    Some(s.lines().next().unwrap_or("").chars().take(60).collect())
 }
 
 pub async fn detect_all() -> HashMap<String, CliInfo> {
     let mut out = HashMap::new();
+    let mut chosen = HashMap::new();
     for name in ["claude", "codex", "gemini"] {
-        let mut info = CliInfo::default();
-        if let Some(p) = resolve(name) {
-            info.path = Some(p.display().to_string());
-            let mut cmd = command(&p);
-            cmd.arg("--version").stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
-            if let Ok(Ok(o)) = tokio::time::timeout(Duration::from_secs(20), cmd.output()).await {
-                let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                let s = if s.is_empty() { String::from_utf8_lossy(&o.stderr).trim().to_string() } else { s };
-                if o.status.success() {
-                    info.version = Some(s.lines().next().unwrap_or("").chars().take(60).collect());
+        let mut best: Option<(Vec<u64>, PathBuf, String)> = None;
+        for p in candidates(name) {
+            if let Some(ver) = version_of(&p).await {
+                let key = parse_version(&ver);
+                if best.as_ref().map(|(k, _, _)| key > *k).unwrap_or(true) {
+                    best = Some((key, p, ver));
                 }
             }
         }
+        let mut info = CliInfo::default();
+        if let Some((_, p, ver)) = best {
+            info.path = Some(p.display().to_string());
+            info.version = Some(ver);
+            chosen.insert(name.to_string(), p);
+        }
         out.insert(name.to_string(), info);
+    }
+    if let Ok(mut c) = CHOSEN.write() {
+        *c = Some(chosen);
     }
     out
 }

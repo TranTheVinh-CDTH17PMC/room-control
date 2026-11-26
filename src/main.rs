@@ -604,8 +604,12 @@ async fn run_leader(st: &Shared, room_id: &str, message: &str, tx: &Tx) {
                 if seat_status(st, &leader.id).await != "sleeping" {
                     set_state(st, tx, &leader.id, "idle", "Chưa có việc").await;
                 }
-                emit(tx, json!({"type": "error", "text": format!("Leader lỗi: {e}")})).await;
-                break;
+                let hint = if e.contains("does not support this model") || e.contains("or newer is required") {
+                    "\n\nCách sửa: mở PowerShell chạy `claude update` (hoặc `npm install -g @anthropic-ai/claude-code@latest`), rồi mở lại app. Hoặc tạm đổi model của Leader sang Opus 4.8 trong Chỗ ngồi & model."
+                } else { "" };
+                emit(tx, json!({"type": "error", "text": format!("Leader lỗi: {e}{hint}")})).await;
+                st.rooms.lock().await.insert(room_id.to_string(), history);
+                return;
             }
         };
 
